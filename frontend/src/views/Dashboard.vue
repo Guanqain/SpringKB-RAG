@@ -38,12 +38,18 @@ const sourceDist = computed<DistItem[]>(() => {
 
 const versionDist = computed<DistItem[]>(() => {
   const total = totalDocs.value || 1
-  const v32 = store.documents.filter((d) => d.version === '3.2').length
-  const v33 = store.documents.filter((d) => d.version === '3.3').length
-  return [
-    { label: 'Spring Boot 3.2', count: v32, pct: (v32 / total) * 100 },
-    { label: 'Spring Boot 3.3', count: v33, pct: (v33 / total) * 100 },
-  ]
+  const counts = new Map<string, number>()
+  store.documents.forEach((d) => {
+    const v = d.version || '未知'
+    counts.set(v, (counts.get(v) || 0) + 1)
+  })
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([version, count]) => ({
+      label: `版本 ${version}`,
+      count,
+      pct: (count / total) * 100,
+    }))
 })
 
 const activeDist = computed<DistItem[]>(() => {

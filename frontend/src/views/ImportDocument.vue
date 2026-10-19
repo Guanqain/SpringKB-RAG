@@ -110,10 +110,10 @@ function resetForm() {
           </el-radio-group>
         </el-form-item>
         <el-form-item label="版本" prop="version">
-          <el-radio-group v-model="form.version">
-            <el-radio-button value="3.2">3.2</el-radio-button>
-            <el-radio-button value="3.3">3.3</el-radio-button>
-          </el-radio-group>
+          <el-input
+            v-model="form.version"
+            placeholder="如 3.3 / 3.x / 4.2-SNAPSHOT / latest"
+          />
         </el-form-item>
         <el-form-item label="标题" prop="title">
           <el-input v-model="form.title" placeholder="文档标题" />

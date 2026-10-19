@@ -53,6 +53,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
                 // 用户侧公开接口：demo 冒烟 + 后续问答
                 .requestMatchers("/api/demo/**", "/api/qa/**").permitAll()
+                // 前端页面与静态资源（容器一体化部署模式：前端产物托管于 static/）
+                .requestMatchers("/", "/index.html", "/login", "/documents/**",
+                        "/assets/**", "/favicon.ico", "/vite.svg").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(eh -> eh.authenticationEntryPoint((request, response, e) -> {
                 response.setStatus(401);

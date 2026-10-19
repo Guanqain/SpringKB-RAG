@@ -2,7 +2,7 @@ export interface Document {
   id: string
   title: string
   source: 'official' | 'community'
-  version: '3.2' | '3.3'
+  version: string
   active: boolean
   chunkCount: number
   createdAt: string
@@ -18,7 +18,7 @@ export interface Chunk {
 
 export interface ImportRequest {
   source: 'official' | 'community'
-  version: '3.2' | '3.3'
+  version: string
   title: string
   docKey: string
   text: string

@@ -1,0 +1,25 @@
+# 集成测试专用库（springkb_test，docker 容器 rag-postgres 管理，允许残留数据）
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:63892/springkb_test
+    username: postgres
+    password: ragpass
+    driver-class-name: org.postgresql.Driver
+  sql:
+    init:
+      mode: always
+
+  ai:
+    deepseek:
+      # 仅用于上下文启动（Chat 不被测试调用）；优先环境变量，缺省用本地假值
+      api-key: ${DEEPSEEK_API_KEY:test-only-local-key-not-used}
+    openai:
+      # Embedding 已被 @MockitoBean 替换，此 key 不触发任何真实调用
+      api-key: ${DASHSCOPE_API_KEY:test-only-local-key-not-used}
+    vectorstore:
+      pgvector:
+        dimensions: 1024
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        initialize-schema: true
+        id-type: TEXT

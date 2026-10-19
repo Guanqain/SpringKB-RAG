@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
@@ -9,6 +9,13 @@ import type { Chunk, Document } from '@/types/document'
 
 const router = useRouter()
 const store = useDocumentStore()
+
+// 版本下拉从已加载文档动态提取（真实库内版本为 3.x / latest / 4.2-SNAPSHOT 等，非固定 3.2/3.3）
+const versionOptions = computed(() => {
+  const set = new Set<string>()
+  store.documents.forEach((d) => d.version && set.add(d.version))
+  return [...set].sort()
+})
 
 const filterForm = reactive({
   source: '',
@@ -90,8 +97,7 @@ async function openChunks(doc: Document) {
         <el-option label="社区问答" value="community" />
       </el-select>
       <el-select v-model="filterForm.version" placeholder="版本" clearable class="w-120">
-        <el-option label="3.2" value="3.2" />
-        <el-option label="3.3" value="3.3" />
+        <el-option v-for="v in versionOptions" :key="v" :label="v" :value="v" />
       </el-select>
       <el-select v-model="filterForm.active" placeholder="状态" clearable class="w-120">
         <el-option label="活跃" value="true" />

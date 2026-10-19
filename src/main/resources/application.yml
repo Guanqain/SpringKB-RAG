@@ -39,6 +39,9 @@ spring:
 
 # 认证：JWT 签发与校验（生产环境务必通过 JWT_SECRET 覆盖默认值）
 app:
+  # 权威性加权（§6.3）：official 文档在初检相似度上加成；环境变量 APP_RAG_BOOST 可覆盖
+  rag:
+    boost: 0.15
   jwt:
     secret: ${JWT_SECRET:dev-only-change-me-springkb-rag-2026-secret-key}
     expiration-hours: ${JWT_EXPIRATION_HOURS:24}

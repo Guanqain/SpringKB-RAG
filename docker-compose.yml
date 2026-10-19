@@ -17,5 +17,27 @@ services:
       timeout: 5s
       retries: 10
 
+  # SpringKB-RAG 应用（前端已打入 static/，一体化部署，端口 8080）
+  app:
+    build: .
+    container_name: rag-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # 容器内通过 compose 网络访问 postgres 服务（覆盖 dev profile 的 localhost:63892）
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ragdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ragpass
+      # API Key 与 JWT 密钥从宿主机环境变量透传（可留空，问答/灌库功能才需要）
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-springkb-rag-2026-secret-key}
+      SPRING_PROFILES_ACTIVE: dev
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
 volumes:
   springkb-pgdata:
+
