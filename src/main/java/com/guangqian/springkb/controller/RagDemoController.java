@@ -1,4 +1,4 @@
-package com.guangqian.springkb.demo;
+package com.guangqian.springkb.controller;
 
 import java.util.LinkedHashMap;
 import java.util.List;

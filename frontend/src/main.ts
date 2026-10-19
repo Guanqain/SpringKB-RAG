@@ -6,9 +6,15 @@ import 'element-plus/dist/index.css'
 import '@/styles/theme.css'
 import App from './App.vue'
 import router from './router'
+import { useAuthStore } from '@/stores/auth'
 
 const app = createApp(App)
-app.use(createPinia())
+const pinia = createPinia()
+app.use(pinia)
 app.use(router)
 app.use(ElementPlus, { locale: zhCn })
+
+// 刷新后恢复登录态（拉取当前用户）
+useAuthStore(pinia).restoreSession()
+
 app.mount('#app')

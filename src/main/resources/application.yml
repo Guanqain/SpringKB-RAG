@@ -4,6 +4,11 @@ spring:
   profiles:
     active: dev
 
+  # 启动时执行 schema.sql（幂等建表，CREATE TABLE IF NOT EXISTS）
+  sql:
+    init:
+      mode: always
+
   ai:
     # Chat: DeepSeek；Embedding: 阿里云百炼（OpenAI 兼容模式）
     model:
@@ -31,3 +36,10 @@ spring:
         initialize-schema: true
         # 用可读的字符串文档 ID（如 fake-doc-official-cds-33）
         id-type: TEXT
+
+# 认证：JWT 签发与校验（生产环境务必通过 JWT_SECRET 覆盖默认值）
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-change-me-springkb-rag-2026-secret-key}
+    expiration-hours: ${JWT_EXPIRATION_HOURS:24}
+

@@ -1,10 +1,20 @@
 import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
+import { TOKEN_KEY } from '@/utils/constants'
 import type { ApiResponse } from '@/types/document'
 
 const instance: AxiosInstance = axios.create({
   baseURL: '/api',
   timeout: 30000,
+})
+
+// 请求注入 JWT
+instance.interceptors.request.use((config) => {
+  const token = localStorage.getItem(TOKEN_KEY)
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
 })
 
 instance.interceptors.response.use(
@@ -22,9 +32,17 @@ instance.interceptors.response.use(
     return resp
   },
   (err) => {
-    const msg =
-      err.response?.data?.message || err.message || '网络错误，请稍后重试'
-    ElMessage.error(msg)
+    if (err.response?.status === 401) {
+      // 登录态失效：清空 token 并跳转登录页
+      localStorage.removeItem(TOKEN_KEY)
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login'
+      }
+    } else {
+      const msg =
+        err.response?.data?.message || err.message || '网络错误，请稍后重试'
+      ElMessage.error(msg)
+    }
     return Promise.reject(err)
   },
 )
