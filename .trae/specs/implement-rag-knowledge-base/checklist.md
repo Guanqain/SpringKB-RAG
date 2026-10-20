@@ -46,9 +46,15 @@
 - [x] app + postgres 一键启动，接口可访问
 - [x] Dockerfile 三阶段构建 + compose 一键启动验收通过（前端页面/静态资源/SPA 回退/注册/列表 235 篇/数据导入 8 项全过）
 
+## 用户端问答页（/qa）
+- [x] 后端 /api/qa/versions 公开端点 + QaVersionsTest（mvn test 44/44）
+- [x] 前端 QaHome + 5 子组件（暖橘玻璃视觉）、路由公开 + guard 修复、build 门禁
+- [x] 浏览器联调 8 项全过（免登录/命中态/角标脉冲/版本下拉/历史回看/兜底态）
+- [x] 健壮性/可行性/安全性审查通过，文档已同步（devlog / agent.md / 详细设计 §5.4）
+
 ## Task 9 · 演示素材
 - [ ] 截图/录屏与面试话术就绪
 
 ## 全局
-- [ ] 所有模块 mvn test 通过
-- [ ] 所有改动已同步 docs/详细设计.md、agent.md、docs/devlog/
+- [x] 所有模块 mvn test 通过（44/44）
+- [x] 所有改动已同步 docs/详细设计.md、agent.md、docs/devlog/

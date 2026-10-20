@@ -54,6 +54,12 @@ public class QaController {
         }
     }
 
+    /** GET /api/qa/versions：active 文档的去重版本列表（用户端版本下拉元数据，公开）。 */
+    @GetMapping("/versions")
+    public ApiResponse<List<String>> versions() {
+        return ApiResponse.ok(qaService.listActiveVersions());
+    }
+
     /** POST /api/qa/ask（§5.2）：question 必填；version 可选；topK 缺省 5、钳制 1~10。version 非法映射 400。 */
     @PostMapping("/ask")
     public ApiResponse<QaResult> ask(@RequestBody AskRequest req) {

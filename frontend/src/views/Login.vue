@@ -73,11 +73,13 @@ function switchTab(tab: 'login' | 'register') {
   <div class="login-page">
     <div class="login-card">
       <div class="login-brand">
-        <div class="brand-mark">KB</div>
-        <div>
-          <h1>SpringKB-RAG</h1>
-          <p>知识库管理后台 · 登录</p>
+        <div class="brand-mark">
+          <svg width="28" height="28" viewBox="0 0 24 24">
+            <path d="M4 4h16v4H4V4zm0 8h10v8H4v-8zm12 0h4v8h-4v-8z" fill="#fff" />
+          </svg>
         </div>
+        <h1>Spring<span>KB</span></h1>
+        <p>团队知识库 · 登录以继续</p>
       </div>
 
       <el-tabs v-model="activeTab" class="login-tabs" @tab-change="switchTab">
@@ -139,24 +141,25 @@ function switchTab(tab: 'login' | 'register') {
 
 <style scoped>
 .login-page {
-  flex: 1;
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-8) var(--sp-4);
   background:
-    radial-gradient(900px 480px at 15% 20%, rgba(20, 184, 166, 0.18), transparent 60%),
-    radial-gradient(800px 420px at 85% 80%, rgba(13, 148, 136, 0.14), transparent 55%),
-    #12202b;
+    radial-gradient(ellipse 55% 40% at 18% 8%, rgba(251, 146, 60, 0.14) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 45% at 85% 15%, rgba(249, 115, 22, 0.12) 0%, transparent 60%),
+    var(--page-bg);
 }
 
 .login-card {
-  width: 380px;
-  background: var(--kb-surface);
-  border-radius: 14px;
-  padding: 32px 34px 24px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
-  animation: login-in 0.35s ease;
+  width: 400px;
+  max-width: 100%;
+  background: #fff;
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-2xl);
+  padding: var(--sp-10);
+  box-shadow: var(--shadow-xl);
+  animation: login-in 0.35s var(--ease-out);
 }
 
 @keyframes login-in {
@@ -172,52 +175,102 @@ function switchTab(tab: 'login' | 'register') {
 
 .login-brand {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
+  text-align: center;
+  margin-bottom: var(--sp-6);
 }
 
 .brand-mark {
-  width: 42px;
-  height: 42px;
-  border-radius: 11px;
-  background: linear-gradient(135deg, #0f766e, #14b8a6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 14px;
-  color: #fff;
-  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--r-lg);
+  background: var(--grad-brand);
+  display: grid;
+  place-items: center;
+  box-shadow: var(--shadow-md);
+  margin-bottom: var(--sp-4);
 }
 
 .login-brand h1 {
-  font-size: 19px;
+  font-size: var(--fs-3xl);
+  font-weight: 800;
+  color: var(--ink-900);
   margin: 0;
-  line-height: 1.2;
+}
+
+.login-brand h1 span {
+  color: var(--brand-500);
 }
 
 .login-brand p {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: var(--kb-text-sub);
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-md);
+  color: var(--ink-500);
 }
 
 .login-tabs {
-  margin-bottom: 6px;
+  margin-bottom: var(--sp-4);
 }
 
-.login-btn {
+.login-tabs :deep(.el-tabs__nav-wrap)::after {
+  background: var(--ink-100);
+}
+
+.login-tabs :deep(.el-tabs__nav) {
   width: 100%;
-  margin-top: 4px;
+  display: flex;
+}
+
+.login-tabs :deep(.el-tabs__item) {
+  flex: 1;
+  justify-content: center;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink-500);
+}
+
+.login-tabs :deep(.el-tabs__item.is-active) {
+  color: var(--brand-600);
+}
+
+.login-tabs :deep(.el-tabs__active-bar) {
+  height: 3px;
+  border-radius: 3px;
+  background: var(--grad-brand);
+}
+
+.login-card :deep(.el-input__wrapper) {
+  border-radius: var(--r-md);
+  box-shadow: 0 0 0 1px var(--ink-200) inset;
+}
+
+.login-card :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px var(--brand-400) inset, 0 0 0 3px rgba(249, 115, 22, 0.12);
+}
+
+.el-button.login-btn {
+  width: 100%;
+  height: 44px;
+  margin-top: var(--sp-2);
+  border: none;
+  background: var(--grad-brand);
   font-weight: 600;
   letter-spacing: 2px;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.25);
+}
+
+.el-button.login-btn:hover,
+.el-button.login-btn:focus {
+  background: var(--grad-brand);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.35);
 }
 
 .login-footnote {
-  margin: 16px 0 0;
+  margin: var(--sp-5) 0 0;
   text-align: center;
-  font-size: 11.5px;
-  color: var(--kb-text-sub);
+  font-size: var(--fs-xs);
+  color: var(--ink-400);
 }
 </style>

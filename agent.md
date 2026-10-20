@@ -39,7 +39,7 @@ springKB/
 │   ├── common/          # 通用（ApiResponse 统一响应）
 │   └── demo/            # 种子数据（FakeDocumentSeeder）
 ├── src/main/resources/  # application.yml / application-dev.yml / schema.sql
-├── frontend/            # Vue 3 管理端（Vite dev : 5173，/api 代理 → 8080）
+├── frontend/            # Vue 3 前端（v2：暖橘设计 + 用户端 NavBar 外壳 + 管理端 /admin 深色侧边栏；Vite dev : 5173，/api 代理 → 8080）
 └── docs/                # 详细设计.md / 项目计划书.md / devlog/ 开发日志
 ```
 
@@ -55,6 +55,8 @@ springKB/
 | D6 | 后端按 controller / service / repository / entity / dto / security / config 分层 | 便于开发人员理解与维护 |
 | D7 | **数据驱动 schema**：先爬真实文档再定表结构 | kb_document 字段依据 vuejs.org / docs.spring.io 真实元数据修订：`product`/`origin`+`authority`/`version`/`language`/`doc_type`/`last_modified` |
 | D8 | 爬虫按 source adapter 模式（`DocumentCrawler` 接口 + 每站一个实现） | 便于扩展任意数据源（工具文档、社区问答等） |
+| D9 | **v2 定位：私有化单实例知识库，隔离在部署边界，不做多租户**（2026-10-20 定稿） | 企业不愿机密上 SaaS；私有化下 tenant_id 是伪需求；物理隔离强于行级逻辑隔离（同 GitLab/Gitea 模型）。不做：多租户/平台公共区/关注评论/协同编辑/对外分享；做：admin·member 两角色 + 文档 private/team 两级可见 + UGC 权威加权（official 1.0 > ugc 0.9 > community 0.8）+ 新鲜度降权。详见 docs/v2产品规划.md + docs/详细设计_v2.md（v2.2） |
+| D10 | v2 前端以根目录 `demo.html` 原型为设计基准（8 视图 + 暖橘 token 体系） | 主导航仅 首页/问答/知识库，账户类入口收头像菜单，管理后台深色侧边栏独立形态；实现时从原型迁移组件与样式 |
 
 ## 5. 开发约定
 
@@ -105,6 +107,12 @@ curl -X POST http://localhost:8080/api/auth/register -H "Content-Type: applicati
 19. **PowerShell curl 传 JSON**：`-d '{"a":1}'` 的双引号会被吞导致 parse error；用 `--data-binary "@文件"` 传 JSON 文件，或 curl.exe 单独调用。
 20. **Docker Hub 国内直连超时**（registry-1.docker.io:443 无响应）：构建镜像连续失败先查 daemon 状态（`npipe dockerDesktopLinuxEngine` 连不上=Docker Desktop 未启动）再查网络；对策为 Dockerfile 基础镜像加 `dockerproxy.net` 前缀（标准 Docker Hub 代理，任意网络可用；已实测 busybox/node/maven 可拉取）。
 21. **受控 el-switch 提示文案**：异步切换反馈文案必须基于切换**目标值**/服务端返回值计算，读取操作前旧状态会导致「启用提示已停用」的反向提示（DocumentList.vue 已修复）。
+22. **search 能召回 ≠ ask 能命中**：ask 兜底需初检 topScore ≥ `app.rag.similarity-threshold`（0.65）；中文短问法对英文文档语料相似度普遍偏低（如「createApp 是做什么的？」触发兜底），完整英文问法可命中（0.68~0.85）。演示/示例问法必须先用真实库验证过 topScore。
+23. **CSS animation 重触发**：Vue 对相同 class 的重复赋值不会重播 CSS animation（diff 视为无变化）。需「重置→nextTick→设值」让类经历移除→添加（QaHome.onCite 引用定位脉冲已修复）；另注意脉冲动画结束后 box-shadow 回落 none，自动化测试必须在动画窗口内检测 animationName 而非结束态样式。
+24. **Rollup AST 对正则字面量的 `//` 误判**：ES module 里写 `/^(?:https?:\/\/|\./i` 这类正则，Rollup 会把 `//` 当作注释起始符解析，报 `Invalid regular expression: Unterminated group`。对策：避免正则字面量里出现 `//`，改用 `new RegExp('...')` 字符串构造或用 DOMPurify 内置的 `ALLOWED_URI_PROTOCOLS`（默认已拒绝 javascript:/data:/vbscript:）。
+25. **TrustedHTML 与 string 类型不兼容**：`DOMPurify.sanitize()` 返回全局安全类型 `TrustedHTML`，与我们代码里 `interface RenderedPiece { html?: string }` 冲突。`as unknown as string` 显式转换即可——TrustedHTML 运行时就是字符串，v-html 也接受。
+26. **打字机逐字效果与 Markdown 不兼容**：逐字截断的 markdown 产生残缺 HTML（未闭合标签、表格断裂），无法正确渲染。对策：改为整段 fade-in 入场（opacity transition），保留视觉节奏但不破坏结构。
+27. **登录态残留导致回归误报**：浏览器 session 会保留上一会话的 `localStorage` token，未清空就测「未登录应跳转 /login」会得到「守卫失效」的假结论。**登录态相关回归项必须先 `localStorage.clear()` 重置**。同类误报：Vue scoped 样式会把 `@keyframes` 重命名为 `qa-pulse-<hash>`，断言动画名时须按**前缀**匹配而非全等；DevTools 自身的 highlighting 也会污染 `[class*=hl]` 类查询。
 
 ## 8. 进度状态
 
@@ -119,10 +127,15 @@ curl -X POST http://localhost:8080/api/auth/register -H "Content-Type: applicati
 - ✅ **RAG 三能力全部落地**（Task 2/3/4）。
 - ✅ **真实数据灌库 + 三条验证用例（Task 5）**：`--import=all` 入库 235 篇真实文档（233 official：vue 80 / spring-ai 80 / spring-boot 73 + 2 community 注入样本），854 chunks / 856 向量行。三条验证用例全部通过（版本过滤 / 权威性加权 / 无答案兜底），引用溯源正向用例带 [1][2][3] 引用；逐条记录见 [docs/测试用例文档.md](docs/测试用例文档.md)。`mvn test` 33/33 通过。真实数据暴露 3 个坑（$ 转义 / 爬虫字段缺口 / 百炼批量上限）已修复并回归。
 - ✅ **README 与架构图（Task 7）**：根目录 [README.md](README.md) —— 问题背景（版本割裂 / 来源混杂 / 无答案硬编）→ 三能力设计与验证（235 篇真实数据 + 42/42 测试）→ mermaid 架构图 → 技术栈 / 快速启动 / 目录结构 / 已知限制 6 条。所有产品级文档（README / 详细设计 / 测试用例 / devlog）齐备。
+- ✅ **v1 收尾优化（2026-10-20）**：AnswerCard 改 Markdown 渲染（marked + DOMPurify 白名单净化，打字机改 fade-in）；SourceCard 视觉降权（低饱和描边 + 近白标题）；示例问法替换为实测命中问法；联调 5 项全过；新坑 #24~#26（Rollup 正则注释误判 / TrustedHTML 类型 / 打字机与 Markdown 不兼容）。
+- ✅ **v2 方向定稿（2026-10-20，决策见 D9/D10）**：经多轮讨论从「类 CSDN 社区 + RAG」→「多租户 SaaS」→ 收敛为 **私有化单实例团队知识库 + RAG**。两份 v2 文档重写至 v2.2：docs/v2产品规划.md（定位定稿 / 不做清单 / 权威三档加权 + 新鲜度公式 / V2.0~V2.4 阶段表 / 验收场景）、docs/详细设计_v2.md（无 tenant_id 的 schema 演进 / setup 向导 / 可见性统一谓词 / 分阶段门禁）。社交砍到点赞+收藏，关注/评论/多租户/公共区明确不做。
+- ✅ **demo.html 前端原型（2026-10-20）**：根目录单文件高保真原型，8 视图（首页/问答/知识库左树右卡/文档详情/Setup 向导/个人中心/写文档/管理后台），暖橘 token 体系 + 暖白底 #FDFCFA；头像菜单承载账户入口，管理后台深色侧边栏独立形态。作为 v2 全部前端页面的设计基准。
+- ✅ **v2 前端重建 + 迁移回归验收（2026-10-20，spec `rebuild-frontend-v2` Task 1~11 全过）**：以 `demo.html` 为基准**废弃 v1 管理端形态**——`theme.css` 重建暖橘 token（`--brand-500 #F97316`、暖白底 `#FDFCFA`、暖色投影）+ 覆盖 Element Plus 变量；`App.vue` 改为 NavBar + Footer 外壳（账户入口收头像菜单），管理端独立深色侧边栏；路由收敛为 `/`、`/qa`、`/kb`、`/kb/doc/:id`、`/login`、`/setup`、`/me`、`/editor`、`/admin/*`；迁移问答页 / 登录页 / 管理端（概览·文档管理·数据导入，接口与行为不变，active 提示文案仍取目标值），其余页面为**空态外壳（不伪造数据）**；删除 3 个旧视图 + `--kb-*` 兼容 token 块。回归 11 项浏览器实测全过、`npm run build` 通过。新坑 #27（登录态残留/动画名 hash 导致回归误报）。
+- ⏭️ **下一步**：**C1~C8 待确认清单待用户逐条裁决**（开放注册 / 问答免登录 / 无角色区分 / 文档可见性 / 权威三档 / 来源粒度 / DTO 字段 / 管理端能力，见 [docs/用户端前端设计.md](docs/用户端前端设计.md) §9）；裁决通过后进入 V2.0 编码（KbController overview/tree/docs/doc/:id + QaService 来源聚合 SourceRefV2 + /kb 左树右卡 + 文档详情 + 问答页来源卡文档级改造），门禁：聚合单测 + mvn test 全量 + 浏览器联调。
 
 ## 9. 开发日志索引
 
 | 日期 | 日志文件 | 主题 |
 | --- | --- | --- |
 | 2026-10-19 | [devlog/2026-10-19.md](./docs/devlog/2026-10-19.md) | 认证壳子打通；文档爬虫（3 源 adapter）；kb_document 数据驱动修订 |
-| 2026-10-20 | [devlog/2026-10-20.md](./docs/devlog/2026-10-20.md) | Task 1 导入链路：分块器 + 幂等入库 + 测试门禁 + 文档同步 ｜ Task 5 真实数据灌库 + 三条验证用例（$ 转义 / 爬虫字段缺口 / 百炼批量上限 3 坑） ｜ **Task 6 管理接口 + 前端联调（active 双写、URL 白名单防 SSRF、前端版本动态化、状态开关提示文案修复）** ｜ **Task 7 README 与架构图** ｜ **Task 8 Docker 一体化部署（dockerproxy 镜像源 + 8 项验收全过）** |
+| 2026-10-20 | [devlog/2026-10-20.md](./docs/devlog/2026-10-20.md) | Task 1 导入链路：分块器 + 幂等入库 + 测试门禁 + 文档同步 ｜ Task 5 真实数据灌库 + 三条验证用例（$ 转义 / 爬虫字段缺口 / 百炼批量上限 3 坑） ｜ **Task 6 管理接口 + 前端联调（active 双写、URL 白名单防 SSRF、前端版本动态化、状态开关提示文案修复）** ｜ **Task 7 README 与架构图** ｜ **Task 8 Docker 一体化部署（dockerproxy 镜像源 + 8 项验收全过）** ｜ **用户端问答页 /qa（versions 端点 + 暖橘玻璃视觉 + 角标脉冲 + 问法阈值坑 #22/#23）** ｜ **v1 收尾：答案卡 Markdown 渲染 + 来源卡视觉降权（坑 #24~#26）** ｜ **v2 方向定稿（私有化单实例，ADR D9/D10）+ v2 文档重写 v2.2 + demo.html 8 视图原型** ｜ **v2 前端重建（暖橘 token + NavBar 外壳 + /admin 深色侧边栏）+ 迁移回归 11 项全过（坑 #27 回归误报）** |

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// 管理后台 · 概览：由原 Dashboard 迁移，数据均来自 /api/admin/documents 真实聚合。
 import { computed, onMounted } from 'vue'
 import StatCard from '@/components/StatCard.vue'
 import { useDocumentStore } from '@/stores/document'
@@ -62,7 +63,12 @@ const activeDist = computed<DistItem[]>(() => {
 </script>
 
 <template>
-  <div class="dashboard page-enter">
+  <div class="page-enter">
+    <div class="page-head">
+      <h2 class="page-head__title">概览</h2>
+      <p class="page-head__sub">团队知识库整体概况（数据来自 admin documents 聚合）</p>
+    </div>
+
     <el-row :gutter="16">
       <el-col :span="6">
         <StatCard label="文档总数" :value="totalDocs" hint="kb_document 行数" tone="primary" />
@@ -102,7 +108,7 @@ const activeDist = computed<DistItem[]>(() => {
               <span class="mono">{{ item.count }} · {{ item.pct.toFixed(0) }}%</span>
             </div>
             <div class="dist-track">
-              <div class="dist-fill dist-fill--teal" :style="{ width: item.pct + '%' }" />
+              <div class="dist-fill dist-fill--amber" :style="{ width: item.pct + '%' }" />
             </div>
           </div>
         </div>
@@ -131,8 +137,9 @@ const activeDist = computed<DistItem[]>(() => {
 }
 
 .dist-title {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--ink-900);
   margin: 0 0 16px;
 }
 
@@ -147,30 +154,30 @@ const activeDist = computed<DistItem[]>(() => {
 .dist-head {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
-  color: var(--kb-text-sub);
+  font-size: var(--fs-sm);
+  color: var(--ink-500);
   margin-bottom: 6px;
 }
 
 .dist-track {
   height: 8px;
   border-radius: 4px;
-  background: #eef1f3;
+  background: var(--ink-100);
   overflow: hidden;
 }
 
 .dist-fill {
   height: 100%;
   border-radius: 4px;
-  background: linear-gradient(90deg, var(--kb-primary), var(--kb-accent));
+  background: var(--grad-brand);
   transition: width 0.4s ease;
 }
 
-.dist-fill--teal {
-  background: linear-gradient(90deg, #0d9488, #2dd4bf);
+.dist-fill--amber {
+  background: linear-gradient(90deg, var(--brand-400), var(--brand-600));
 }
 
 .dist-fill--emerald {
-  background: linear-gradient(90deg, #059669, #34d399);
+  background: linear-gradient(90deg, var(--success), #34d399);
 }
 </style>

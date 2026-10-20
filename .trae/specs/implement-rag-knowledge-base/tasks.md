@@ -69,6 +69,13 @@
   - [x] Dockerfile 应用容器化，compose 一键启动
   - [x] 部署验收：接口可访问、数据可导入
 
+- [x] 用户端问答页（/qa，设计文档 docs/用户端前端设计.md v1.1）
+  - [x] 后端：`GET /api/qa/versions` 公开端点 + QaVersionsTest（mvn test 44/44）
+  - [x] 前端：QaHome + AskInput/AnswerCard/SourceCard/FallbackCard/HistoryList（暖橘渐变玻璃拟态）
+  - [x] 路由 /qa 公开 + guard 修复（public 页不再弹回管理端）+ build 门禁
+  - [x] 浏览器联调：免登录、命中态（角标/来源卡/脉冲）、版本下拉、历史回看、兜底态
+  - [x] 审查 + 文档同步（devlog / agent.md / 详细设计 §5.4）
+
 - [ ] Task 9: 演示素材与面试话术
   - [ ] 截图/录屏（版本过滤、权威性排序、兜底三个演示）
   - [ ] 面试话术（每个能力 STAR 故事、"和 Dify/扣子区别"）

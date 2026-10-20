@@ -21,8 +21,8 @@ const toneClass = computed(() => `stat-card--${props.tone ?? 'primary'}`)
 
 <style scoped>
 .stat-card {
-  background: var(--kb-surface);
-  border: 1px solid var(--kb-border);
+  background: #fff;
+  border: 1px solid var(--ink-200);
   border-radius: 10px;
   padding: 18px 20px;
   display: flex;
@@ -38,18 +38,18 @@ const toneClass = computed(() => `stat-card--${props.tone ?? 'primary'}`)
 
 .stat-label {
   font-size: 13px;
-  color: var(--kb-text-sub);
+  color: var(--ink-500);
 }
 
 .stat-value {
   font-size: 30px;
   font-weight: 700;
   line-height: 1.1;
-  color: var(--kb-text);
+  color: var(--ink-800);
 }
 
 .stat-card--primary .stat-value {
-  color: var(--kb-primary);
+  color: var(--brand-500);
 }
 
 .stat-card--success .stat-value {
@@ -57,15 +57,15 @@ const toneClass = computed(() => `stat-card--${props.tone ?? 'primary'}`)
 }
 
 .stat-card--danger .stat-value {
-  color: var(--kb-danger);
+  color: var(--danger);
 }
 
 .stat-card--muted .stat-value {
-  color: var(--kb-text);
+  color: var(--ink-800);
 }
 
 .stat-hint {
   font-size: 12px;
-  color: var(--kb-text-sub);
+  color: var(--ink-500);
 }
 </style>

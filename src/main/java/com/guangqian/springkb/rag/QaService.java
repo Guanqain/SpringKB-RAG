@@ -55,6 +55,16 @@ public class QaService {
     }
 
     /**
+     * 用户端版本下拉元数据（公开接口只读查询）：active 文档的去重版本列表，升序。
+     * 无用户输入参与拼接，无注入面。
+     */
+    public List<String> listActiveVersions() {
+        return jdbcTemplate.queryForList(
+                "SELECT DISTINCT version FROM kb_document WHERE active = true ORDER BY version",
+                String.class);
+    }
+
+    /**
      * 检索增强问答（§6.1）：version 非法时抛 IllegalArgumentException（控制器映射 400）。
      */
     public QaResult ask(String question, String version, int topK) {

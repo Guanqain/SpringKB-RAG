@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// 管理后台 · 文档管理：由原 DocumentList 迁移，接口与行为保持不变（/api/admin/documents）。
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -94,6 +95,11 @@ async function openChunks(doc: Document) {
 
 <template>
   <div class="page-enter">
+    <div class="page-head">
+      <h2 class="page-head__title">文档管理</h2>
+      <p class="page-head__sub">过滤 · 列表 · active 切换 · 删除 · chunks</p>
+    </div>
+
     <div class="card filter-bar">
       <el-select v-model="filterForm.source" placeholder="来源" clearable class="w-140">
         <el-option label="官方文档" value="official" />
@@ -116,7 +122,7 @@ async function openChunks(doc: Document) {
       <el-button type="primary" @click="applyFilter">查询</el-button>
       <el-button @click="resetFilter">重置</el-button>
       <div class="spacer" />
-      <el-button type="primary" plain :icon="Plus" @click="router.push('/documents/import')">
+      <el-button type="primary" plain :icon="Plus" @click="router.push('/admin/import')">
         导入文档
       </el-button>
     </div>
@@ -249,7 +255,7 @@ async function openChunks(doc: Document) {
 
 .time-cell {
   font-size: 12.5px;
-  color: var(--kb-text-sub);
+  color: var(--ink-500);
 }
 
 .chunk-list {
@@ -259,10 +265,10 @@ async function openChunks(doc: Document) {
 }
 
 .chunk-item {
-  border: 1px solid var(--kb-border);
+  border: 1px solid var(--ink-200);
   border-radius: 8px;
   padding: 12px 14px;
-  background: #fbfcfc;
+  background: var(--brand-50);
 }
 
 .chunk-head {
@@ -274,19 +280,19 @@ async function openChunks(doc: Document) {
 
 .chunk-id {
   font-size: 12px;
-  color: var(--kb-text-sub);
+  color: var(--ink-500);
 }
 
 .chunk-meta {
   font-size: 12px;
-  color: var(--kb-primary);
+  color: var(--brand-600);
 }
 
 .chunk-content {
   margin: 0 0 8px;
   font-size: 13px;
   line-height: 1.65;
-  color: var(--kb-text);
+  color: var(--ink-800);
   max-height: 120px;
   overflow-y: auto;
 }

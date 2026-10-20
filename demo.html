@@ -1,0 +1,2172 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpringKB · 智能知识库</title>
+<style>
+/* ========== Design Tokens ========== */
+:root {
+  /* 品牌色 */
+  --brand-50:  #FFF7ED;
+  --brand-100: #FFEDD5;
+  --brand-200: #FED7AA;
+  --brand-300: #FDBA74;
+  --brand-400: #FB923C;
+  --brand-500: #F97316;
+  --brand-600: #EA580C;
+  --brand-700: #C2410C;
+  --brand-800: #9A3412;
+
+  /* 中性色 */
+  --ink-50:  #FAFAFA;
+  --ink-100: #F4F4F5;
+  --ink-200: #E4E4E7;
+  --ink-300: #D4D4D8;
+  --ink-400: #A1A1AA;
+  --ink-500: #71717A;
+  --ink-600: #52525B;
+  --ink-700: #3F3F46;
+  --ink-800: #27272A;
+  --ink-900: #18181B;
+
+  /* 功能色 */
+  --success: #22C55E;
+  --warning: #F59E0B;
+  --danger:  #EF4444;
+  --info:    #3B82F6;
+
+  /* 渐变 */
+  --grad-brand: linear-gradient(120deg, #FF9A3C 0%, #F97316 55%, #E85D04 100%);
+  --grad-soft:  linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%);
+  --grad-hero:  radial-gradient(ellipse 70% 45% at 50% -8%, rgba(253,186,116,.55) 0%, transparent 65%);
+
+  /* 阴影（暖色调投影，更通透） */
+  --shadow-xs: 0 1px 2px rgba(154,52,18,.05);
+  --shadow-sm: 0 1px 3px rgba(154,52,18,.07), 0 1px 2px rgba(154,52,18,.04);
+  --shadow-md: 0 4px 12px -2px rgba(154,52,18,.10), 0 2px 4px -2px rgba(154,52,18,.05);
+  --shadow-lg: 0 12px 28px -6px rgba(154,52,18,.14), 0 4px 8px -4px rgba(154,52,18,.07);
+  --shadow-xl: 0 24px 48px -12px rgba(154,52,18,.18), 0 8px 16px -8px rgba(154,52,18,.08);
+  --glow-brand: 0 0 0 1px rgba(249,115,22,.25), 0 8px 24px -6px rgba(249,115,22,.35);
+
+  /* 圆角 */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --r-2xl: 28px;
+
+  /* 间距 */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px;
+  --sp-4: 16px; --sp-5: 20px; --sp-6: 24px;
+  --sp-8: 32px; --sp-10: 40px;--sp-12: 48px;
+  --sp-16: 64px;--sp-20: 80px;
+
+  /* 字体 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+               "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --fs-xs: 12px;  --fs-sm: 13px;  --fs-md: 14px;
+  --fs-lg: 16px;  --fs-xl: 18px;  --fs-2xl: 20px;
+  --fs-3xl: 24px; --fs-4xl: 30px; --fs-5xl: 36px;
+
+  /* 过渡 */
+  --ease-out: cubic-bezier(.16,1,.3,1);
+  --ease-in-out: cubic-bezier(.65,0,.35,1);
+}
+
+/* ========== Reset & Base ========== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-sans);
+  color: var(--ink-800);
+  background: #FDFCFA;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+input, textarea { font-family: inherit; }
+
+/* ========== Utility ========== */
+.container { max-width: 1200px; margin: 0 auto; padding: 0 var(--sp-6); }
+
+/* ========== Navbar ========== */
+.nav {
+  position: sticky; top: 0; z-index: 50;
+  height: 68px;
+  background: rgba(253,252,250,.75);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border-bottom: 1px solid rgba(228,228,231,.7);
+}
+.nav__inner {
+  height: 100%;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nav__brand {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-weight: 700; font-size: var(--fs-xl);
+  color: var(--ink-900);
+}
+.nav__brand-icon {
+  width: 32px; height: 32px;
+  border-radius: var(--r-md);
+  background: var(--grad-brand);
+  display: grid; place-items: center;
+  box-shadow: var(--shadow-sm);
+}
+.nav__brand-name span { color: var(--brand-500); }
+.nav__links { display: flex; align-items: center; gap: var(--sp-1); }
+.nav__link {
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--r-md);
+  font-size: var(--fs-md);
+  color: var(--ink-600);
+  font-weight: 500;
+  transition: all .15s var(--ease-out);
+  position: relative;
+}
+.nav__link:hover { color: var(--ink-900); background: var(--ink-100); }
+.nav__link--active { color: var(--ink-900); }
+.nav__link--active::after {
+  content: ""; position: absolute; bottom: -1px; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px; border-radius: 50%; background: var(--brand-500);
+}
+.nav__link--soon { color: var(--ink-400); cursor: default; }
+.nav__link--soon:hover { color: var(--ink-400); background: transparent; }
+.nav__soon-tag {
+  font-size: 10px; padding: 1px 6px; border-radius: 4px;
+  background: var(--ink-100); color: var(--ink-500);
+  margin-left: var(--sp-1);
+}
+.nav__actions { display: flex; align-items: center; gap: var(--sp-3); }
+
+/* 用户菜单（P2 业务入口预留） */
+.user-menu { position: relative; }
+.user-menu__avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--ink-100);
+  border: 1px solid var(--ink-200);
+  color: var(--ink-500);
+  cursor: pointer;
+  transition: all .18s var(--ease-out);
+}
+.user-menu__avatar:hover {
+  background: var(--brand-50); color: var(--brand-600);
+  border-color: var(--brand-300);
+}
+.user-menu__dropdown {
+  position: absolute; top: calc(100% + 10px); right: 0;
+  width: 220px;
+  background: #fff;
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-xl);
+  padding: var(--sp-2);
+  opacity: 0; visibility: hidden;
+  transform: translateY(-6px);
+  transition: all .18s var(--ease-out);
+  z-index: 60;
+}
+.user-menu:hover .user-menu__dropdown,
+.user-menu:focus-within .user-menu__dropdown {
+  opacity: 1; visibility: visible; transform: translateY(0);
+}
+.user-menu__header {
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border-bottom: 1px solid var(--ink-100);
+  margin-bottom: var(--sp-2);
+}
+.user-menu__name { font-size: var(--fs-sm); font-weight: 700; color: var(--ink-900); }
+.user-menu__ws { font-size: var(--fs-xs); color: var(--brand-600); font-weight: 500; margin-top: 2px; }
+.user-menu__item {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: 8px var(--sp-3);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm); color: var(--ink-700);
+  transition: all .15s var(--ease-out);
+}
+.user-menu__item:hover { background: var(--brand-50); color: var(--brand-700); }
+.user-menu__item svg { color: var(--ink-400); flex-shrink: 0; }
+.user-menu__item:hover svg { color: var(--brand-500); }
+.user-menu__tag {
+  margin-left: auto;
+  font-size: 10px; font-weight: 700;
+  padding: 2px 6px; border-radius: 4px;
+  background: var(--ink-100); color: var(--ink-400);
+  letter-spacing: .03em;
+}
+.user-menu__tag--admin { background: var(--brand-100); color: var(--brand-700); }
+.user-menu__divider { height: 1px; background: var(--ink-100); margin: var(--sp-2) 0; }
+.btn {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-5);
+  border-radius: var(--r-md);
+  font-size: var(--fs-md); font-weight: 600;
+  transition: all .15s var(--ease-out);
+}
+.btn--ghost { color: var(--ink-700); }
+.btn--ghost:hover { background: var(--ink-100); color: var(--ink-900); }
+.btn--primary {
+  background: var(--grad-brand); color: #fff;
+  box-shadow: 0 2px 8px rgba(249,115,22,.25);
+}
+.btn--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(249,115,22,.35);
+}
+.btn--icon {
+  width: 36px; height: 36px; padding: 0;
+  border-radius: var(--r-md);
+  color: var(--ink-500);
+}
+.btn--icon:hover { background: var(--ink-100); color: var(--ink-700); }
+
+/* ========== Hero ========== */
+.hero {
+  position: relative;
+  padding: 96px 0 88px;
+  background:
+    radial-gradient(ellipse 55% 40% at 18% 8%, rgba(251,146,60,.14) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 85% 15%, rgba(249,115,22,.12) 0%, transparent 60%),
+    #FDFCFA;
+  overflow: hidden;
+}
+.hero::before {
+  content: ""; position: absolute; inset: 0;
+  background: var(--grad-hero);
+  pointer-events: none;
+}
+.hero::after {
+  content: ""; position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(249,115,22,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(249,115,22,.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
+  pointer-events: none;
+}
+.hero__inner { position: relative; text-align: center; max-width: 760px; margin: 0 auto; z-index: 1; }
+.hero__badge {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding: 6px 14px;
+  border-radius: 100px;
+  background: rgba(255,255,255,.7);
+  border: 1px solid var(--brand-200);
+  box-shadow: var(--shadow-xs);
+  font-size: var(--fs-sm); color: var(--brand-700); font-weight: 500;
+  margin-bottom: var(--sp-6);
+}
+.hero__badge-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 3px rgba(34,197,94,.18);
+}
+.hero__title {
+  font-size: 56px; font-weight: 800;
+  color: var(--ink-900);
+  line-height: 1.12; letter-spacing: -.03em;
+  margin-bottom: var(--sp-5);
+}
+.hero__title em {
+  font-style: normal;
+  background: var(--grad-brand);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  position: relative;
+}
+.hero__desc {
+  font-size: var(--fs-xl); color: var(--ink-500);
+  margin-bottom: 40px; line-height: 1.75;
+}
+.hero__search {
+  background: #fff;
+  border: 1px solid var(--ink-200);
+  border-radius: 100px;
+  box-shadow: var(--shadow-lg);
+  padding: 8px 8px 8px 24px;
+  display: flex; align-items: center; gap: var(--sp-3);
+  transition: box-shadow .25s var(--ease-out), border-color .25s, transform .25s var(--ease-out);
+  max-width: 660px; margin: 0 auto var(--sp-5);
+}
+.hero__search:focus-within {
+  border-color: var(--brand-400);
+  box-shadow: var(--glow-brand);
+  transform: translateY(-2px);
+}
+.hero__search-icon { color: var(--brand-500); flex-shrink: 0; }
+.hero__search-input {
+  flex: 1; border: none; outline: none;
+  font-size: var(--fs-lg);
+  background: transparent;
+  color: var(--ink-800);
+  padding: var(--sp-3) 0;
+}
+.hero__search-input::placeholder { color: var(--ink-400); }
+.hero__search-btn {
+  padding: 14px 32px;
+  border-radius: 100px;
+  background: var(--grad-brand); color: #fff;
+  font-weight: 600; font-size: var(--fs-md);
+  box-shadow: 0 4px 14px rgba(249,115,22,.35);
+  transition: transform .18s var(--ease-out), box-shadow .18s;
+}
+.hero__search-btn:hover { transform: translateY(-1px) scale(1.02); box-shadow: 0 8px 20px rgba(249,115,22,.45); }
+.hero__chips {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-2);
+}
+.chip {
+  display: inline-flex; align-items: center; gap: var(--sp-1);
+  padding: 7px 16px;
+  border-radius: 100px;
+  background: rgba(255,255,255,.8);
+  border: 1px solid var(--ink-200);
+  font-size: var(--fs-sm); color: var(--ink-600);
+  cursor: pointer;
+  transition: all .18s var(--ease-out);
+}
+.chip:hover {
+  border-color: var(--brand-400); color: var(--brand-700);
+  background: var(--brand-50);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ========== Stats Bar ========== */
+.stats {
+  padding: var(--sp-10) 0;
+  background: #fff;
+  border-top: 1px solid var(--ink-100);
+  border-bottom: 1px solid var(--ink-100);
+}
+.stats__grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+}
+.stat {
+  text-align: center;
+  padding: var(--sp-2) var(--sp-6);
+}
+.stat + .stat { border-left: 1px solid var(--ink-100); }
+.stat__value {
+  font-size: 40px; font-weight: 800;
+  background: var(--grad-brand);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -.02em; line-height: 1.15;
+}
+.stat__label {
+  font-size: var(--fs-sm); color: var(--ink-500);
+  margin-top: var(--sp-1); font-weight: 500;
+}
+.stat__delta {
+  font-size: var(--fs-xs); color: var(--success);
+  margin-top: var(--sp-1); font-weight: 600;
+}
+
+/* ========== Sections ========== */
+.section { padding: var(--sp-16) 0; }
+.section--alt { background: #fff; }
+.section__header {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  margin-bottom: var(--sp-10);
+}
+.section__title {
+  font-size: var(--fs-4xl); font-weight: 800;
+  color: var(--ink-900); letter-spacing: -.01em;
+}
+.section__subtitle {
+  font-size: var(--fs-lg); color: var(--ink-500);
+  margin-top: var(--sp-2);
+}
+.section__link {
+  display: inline-flex; align-items: center; gap: var(--sp-1);
+  font-size: var(--fs-md); font-weight: 600;
+  color: var(--brand-600);
+  transition: gap .15s var(--ease-out);
+}
+.section__link:hover { gap: var(--sp-2); color: var(--brand-700); }
+.section__link svg { transition: transform .15s var(--ease-out); }
+.section__link:hover svg { transform: translateX(2px); }
+
+/* ========== Product Cards ========== */
+.products {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-6);
+}
+.product {
+  background: #fff;
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-xl);
+  padding: var(--sp-8);
+  transition: all .25s var(--ease-out);
+  position: relative; overflow: hidden;
+  cursor: pointer;
+}
+.product::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--grad-brand);
+  opacity: 0; transition: opacity .25s var(--ease-out);
+}
+.product::after {
+  content: ""; position: absolute; top: -40%; right: -25%;
+  width: 220px; height: 220px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(251,146,60,.12) 0%, transparent 70%);
+  opacity: 0; transition: opacity .3s var(--ease-out);
+  pointer-events: none;
+}
+.product:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-xl);
+  border-color: var(--brand-200);
+}
+.product:hover::before, .product:hover::after { opacity: 1; }
+.product__icon {
+  width: 56px; height: 56px;
+  border-radius: var(--r-lg);
+  display: grid; place-items: center;
+  margin-bottom: var(--sp-5);
+  transition: transform .25s var(--ease-out);
+}
+.product:hover .product__icon { transform: scale(1.08) rotate(-4deg); }
+.product__icon--orange   { background: var(--brand-50); color: var(--brand-600); border: 1px solid var(--brand-100); }
+.product__icon--blue     { background: #EFF6FF; color: #2563EB; border: 1px solid #DBEAFE; }
+.product__icon--green    { background: #F0FDF4; color: #16A34A; border: 1px solid #DCFCE7; }
+.product__title {
+  font-size: var(--fs-2xl); font-weight: 700;
+  color: var(--ink-900);
+  margin-bottom: var(--sp-2);
+}
+.product__desc {
+  font-size: var(--fs-md); color: var(--ink-500);
+  margin-bottom: var(--sp-6);
+  line-height: 1.7;
+}
+.product__meta {
+  display: flex; gap: var(--sp-4);
+  padding-top: var(--sp-5);
+  border-top: 1px dashed var(--ink-200);
+}
+.product__meta-item {
+  font-size: var(--fs-sm); color: var(--ink-500);
+  display: flex; align-items: center; gap: var(--sp-1);
+}
+.product__meta-value { font-weight: 600; color: var(--ink-800); }
+.product__cta {
+  position: absolute; top: var(--sp-8); right: var(--sp-8);
+  width: 36px; height: 36px;
+  border-radius: var(--r-md);
+  background: var(--ink-100);
+  display: grid; place-items: center;
+  color: var(--ink-500);
+  transition: all .2s var(--ease-out);
+}
+.product:hover .product__cta {
+  background: var(--grad-brand); color: #fff;
+}
+
+/* ========== Features Grid ========== */
+.features {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-6);
+}
+.feature {
+  display: flex; gap: var(--sp-5);
+  padding: var(--sp-6);
+  background: #FDFCFA;
+  border: 1px solid var(--ink-200);
+  border-radius: var(--r-xl);
+  transition: all .22s var(--ease-out);
+}
+.feature:hover {
+  background: #fff;
+  box-shadow: var(--shadow-md);
+  border-color: var(--brand-200);
+  transform: translateY(-2px);
+}
+.feature__icon {
+  flex-shrink: 0;
+  width: 44px; height: 44px;
+  border-radius: var(--r-md);
+  background: var(--grad-brand);
+  display: grid; place-items: center;
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(249,115,22,.28);
+}
+.feature__title {
+  font-size: var(--fs-xl); font-weight: 700;
+  color: var(--ink-900);
+  margin-bottom: var(--sp-2);
+}
+.feature__desc {
+  font-size: var(--fs-md); color: var(--ink-500);
+  line-height: 1.7;
+}
+
+/* ========== Footer ========== */
+.footer {
+  padding: var(--sp-12) 0 var(--sp-8);
+  background: var(--ink-900);
+  color: var(--ink-300);
+}
+.footer__grid {
+  display: grid; grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: var(--sp-10);
+  margin-bottom: var(--sp-10);
+}
+.footer__brand-name { color: #fff; font-weight: 700; font-size: var(--fs-xl); }
+.footer__brand-desc {
+  font-size: var(--fs-sm); line-height: 1.7;
+  color: var(--ink-400); margin-top: var(--sp-3);
+  max-width: 320px;
+}
+.footer__col-title {
+  font-size: var(--fs-sm); font-weight: 600;
+  color: var(--ink-100); text-transform: uppercase; letter-spacing: .05em;
+  margin-bottom: var(--sp-4);
+}
+.footer__links { list-style: none; }
+.footer__link {
+  font-size: var(--fs-sm); color: var(--ink-400);
+  padding: var(--sp-2) 0;
+  transition: color .15s var(--ease-out);
+}
+.footer__link:hover { color: var(--brand-300); }
+.footer__bottom {
+  border-top: 1px solid var(--ink-700);
+  padding-top: var(--sp-6);
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: var(--fs-sm); color: var(--ink-500);
+}
+
+/* ========== Responsive ========== */
+@media (max-width: 1024px) {
+  .stats__grid { grid-template-columns: repeat(2, 1fr); }
+  .products { grid-template-columns: repeat(2, 1fr); }
+  .features { grid-template-columns: 1fr; }
+  .footer__grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .nav__links { display: none; }
+  .hero__title { font-size: var(--fs-4xl); }
+  .stats__grid { grid-template-columns: 1fr 1fr; gap: var(--sp-6); }
+  .products { grid-template-columns: 1fr; }
+  .footer__grid { grid-template-columns: 1fr; gap: var(--sp-8); }
+  .section__header { flex-direction: column; align-items: flex-start; gap: var(--sp-4); }
+}
+
+/* ========== Animations ========== */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero__inner { animation: fadeUp .6s var(--ease-out) both; }
+  .product { animation: fadeUp .5s var(--ease-out) both; }
+  .product:nth-child(2) { animation-delay: .1s; }
+  .product:nth-child(3) { animation-delay: .2s; }
+}
+
+/* ========== 通用小组件 ========== */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--fs-xs); font-weight: 600;
+  padding: 2px 8px; border-radius: 4px;
+}
+.badge--official { background: var(--brand-50); color: var(--brand-700); }
+.badge--community { background: var(--ink-100); color: var(--ink-600); }
+.badge--team { background: #F0FDF4; color: #16A34A; }
+.badge--verified { background: #F0FDF4; color: #16A34A; }
+.badge--pending { background: #FFFBEB; color: #B45309; }
+.badge--private { background: var(--ink-100); color: var(--ink-500); }
+.badge--admin {
+  background: var(--brand-100); color: var(--brand-700);
+  font-size: 10px; padding: 1px 6px; border-radius: 4px;
+}
+.page-head { padding: var(--sp-12) 0 var(--sp-8); }
+.page-head__title { font-size: var(--fs-4xl); font-weight: 800; color: var(--ink-900); }
+.page-head__sub { color: var(--ink-500); margin-top: var(--sp-2); }
+.crumb {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-sm); color: var(--ink-400);
+  margin-bottom: var(--sp-5);
+}
+.crumb a { color: var(--ink-500); cursor: pointer; }
+.crumb a:hover { color: var(--brand-600); }
+
+/* ========== 知识库：左树 + 右卡 ========== */
+.kb-layout {
+  display: grid; grid-template-columns: 240px 1fr;
+  gap: var(--sp-6); align-items: start;
+  padding-bottom: var(--sp-16);
+}
+.kb-tree {
+  background: #fff; border: 1px solid var(--ink-200);
+  border-radius: var(--r-xl); padding: var(--sp-4);
+  position: sticky; top: 84px;
+}
+.kb-tree__search {
+  width: 100%; border: 1px solid var(--ink-200);
+  border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-sm); color: var(--ink-700);
+  outline: none; margin-bottom: var(--sp-3);
+}
+.kb-tree__search:focus { border-color: var(--brand-400); }
+.kb-tree details { font-size: var(--fs-sm); }
+.kb-tree summary {
+  cursor: pointer; list-style: none;
+  display: flex; align-items: center; gap: var(--sp-1);
+  padding: 6px var(--sp-2); border-radius: var(--r-sm);
+  color: var(--ink-700); font-weight: 600;
+  user-select: none;
+}
+.kb-tree summary::-webkit-details-marker { display: none; }
+.kb-tree summary:hover { background: var(--ink-50); }
+.kb-tree summary::before {
+  content: ""; width: 0; height: 0; flex-shrink: 0;
+  border-left: 5px solid var(--ink-400);
+  border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+  transition: transform .15s var(--ease-out);
+}
+.kb-tree details[open] > summary::before { transform: rotate(90deg); }
+.kb-tree__group { margin-left: var(--sp-4); }
+.kb-tree__leaf {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px var(--sp-2) 5px var(--sp-3);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm); color: var(--ink-600);
+  cursor: pointer; border-left: 2px solid transparent;
+}
+.kb-tree__leaf:hover { background: var(--ink-50); }
+.kb-tree__leaf--active {
+  border-left-color: var(--brand-500);
+  background: var(--brand-50);
+  color: var(--brand-700); font-weight: 600;
+}
+.kb-tree__count { font-size: var(--fs-xs); color: var(--ink-400); font-weight: 400; }
+.doc-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-4);
+}
+.doc-card {
+  background: #fff; border: 1px solid var(--ink-200);
+  border-radius: var(--r-lg); padding: var(--sp-5);
+  cursor: pointer; transition: all .2s var(--ease-out);
+}
+.doc-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md); border-color: var(--brand-200);
+}
+.doc-card__badges { display: flex; gap: var(--sp-2); align-items: center; margin-bottom: var(--sp-2); flex-wrap: wrap; }
+.doc-card__title { font-weight: 700; color: var(--ink-900); font-size: var(--fs-lg); }
+.doc-card__meta { font-size: var(--fs-sm); color: var(--ink-500); margin-top: var(--sp-1); }
+.doc-card__foot {
+  display: flex; gap: var(--sp-4); align-items: center;
+  margin-top: var(--sp-4); padding-top: var(--sp-3);
+  border-top: 1px dashed var(--ink-200);
+  font-size: var(--fs-xs); color: var(--ink-400);
+}
+.doc-card__stat { display: inline-flex; align-items: center; gap: 4px; }
+
+/* ========== 文档详情 ========== */
+.doc-hero {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: var(--sp-6); margin-bottom: var(--sp-6);
+}
+.doc-hero__meta {
+  display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap;
+  font-size: var(--fs-sm); color: var(--ink-500); margin-top: var(--sp-3);
+}
+.doc-hero__actions { display: flex; gap: var(--sp-2); flex-shrink: 0; }
+.btn--outline {
+  background: #fff; color: var(--ink-700);
+  border: 1px solid var(--ink-200);
+}
+.btn--outline:hover { border-color: var(--brand-400); color: var(--brand-700); background: var(--brand-50); }
+.doc-body {
+  background: #fff; border: 1px solid var(--ink-200);
+  border-radius: var(--r-xl); padding: var(--sp-8);
+  line-height: 1.85; color: var(--ink-700);
+  margin-bottom: var(--sp-6);
+}
+.doc-body h3 { color: var(--ink-900); font-size: var(--fs-2xl); margin: var(--sp-6) 0 var(--sp-3); }
+.doc-body h3:first-child { margin-top: 0; }
+.doc-body p { margin-bottom: var(--sp-3); }
+.doc-body ul { padding-left: var(--sp-6); margin-bottom: var(--sp-3); }
+.doc-body code { background: var(--ink-100); padding: 2px 6px; border-radius: 4px; font-size: var(--fs-sm); }
+.doc-body pre {
+  background: var(--ink-900); color: var(--ink-100);
+  border-radius: var(--r-md); padding: var(--sp-4);
+  overflow-x: auto; font-size: var(--fs-sm);
+  line-height: 1.7; margin: var(--sp-4) 0;
+}
+.doc-body pre code { background: transparent; padding: 0; color: inherit; }
+.doc-src {
+  display: inline-flex; align-items: center; gap: var(--sp-1);
+  color: var(--brand-600); font-weight: 600; font-size: var(--fs-md);
+}
+.doc-src:hover { color: var(--brand-700); }
+.rec-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); }
+.rec-card {
+  background: #fff; border: 1px solid var(--ink-200);
+  border-radius: var(--r-lg); padding: var(--sp-4);
+  cursor: pointer; transition: all .2s var(--ease-out);
+}
+.rec-card:hover { border-color: var(--brand-300); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.rec-card__tag { font-size: var(--fs-xs); color: var(--brand-600); font-weight: 600; margin-bottom: var(--sp-1); }
+.rec-card__title { font-size: var(--fs-md); font-weight: 600; color: var(--ink-900); line-height: 1.4; }
+.rec-card__meta { font-size: var(--fs-xs); color: var(--ink-400); margin-top: var(--sp-1); }
+
+/* ========== 首次启动向导 ========== */
+.setup {
+  min-height: calc(100vh - 68px);
+  display: grid; place-items: center;
+  padding: var(--sp-12) var(--sp-4);
+  background:
+    radial-gradient(ellipse 55% 40% at 18% 8%, rgba(251,146,60,.12) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 85% 15%, rgba(249,115,22,.10) 0%, transparent 60%),
+    #FDFCFA;
+}
+.setup__stack { position: relative; width: 520px; max-width: 100%; }
+.setup__ghost {
+  position: absolute; inset: 0;
+  background: #fff; border: 1px solid var(--ink-200);
+  border-radius: var(--r-2xl);
+  opacity: .45; transform: scale(.96) translateY(14px);
+  pointer-events: none;
+}
+.setup__ghost--2 { opacity: .25; transform: scale(.92) translateY(28px); }
+.setup__card {
+  position: relative;
+  background: #fff; border: 1px solid var(--ink-200);
+  border-radius: var(--r-2xl); padding: var(--sp-10);
+  box-shadow: var(--shadow-xl);
+}
+.setup__logo {
+  width: 52px; height: 52px; border-radius: var(--r-lg);
+  background: var(--grad-brand); display: grid; place-items: center;
+  margin: 0 auto var(--sp-4); box-shadow: var(--shadow-md);
+}
+.setup__title { text-align: center; font-size: var(--fs-3xl); font-weight: 800; color: var(--ink-900); }
+.setup__sub { text-align: center; color: var(--ink-500); margin: var(--sp-2) 0 var(--sp-8); }
+.setup__steps {
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: var(--sp-8);
+}
+.setup__step { display: flex; align-items: center; gap: var(--sp-2); }
+.setup__step-dot {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--ink-100); color: var(--ink-400);
+  font-size: var(--fs-sm); font-weight: 700;
+}
+.setup__step--active .setup__step-dot { background: var(--grad-brand); color: #fff; box-shadow: var(--glow-brand); }
+.setup__step-label { font-size: var(--fs-sm); color: var(--ink-400); font-weight: 500; }
+.setup__step--active .setup__step-label { color: var(--ink-900); font-weight: 700; }
+.setup__step-line { width: 40px; height: 2px; background: var(--ink-200); margin: 0 var(--sp-2); }
+.field { margin-bottom: var(--sp-5); }
+.field__label { display: block; font-size: var(--fs-sm); font-weight: 600; color: var(--ink-700); margin-bottom: var(--sp-2); }
+.field__input, .field__select {
+  width: 100%; border: 1px solid var(--ink-200);
+  border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-md); color: var(--ink-800);
+  outline: none; background: #fff; transition: border-color .15s, box-shadow .15s;
+}
+.field__input:focus, .field__select:focus {
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 3px rgba(249,115,22,.12);
+}
+.setup__preview { opacity: .55; filter: saturate(.7); margin-top: var(--sp-2); }
+.setup__preview-title {
+  font-size: var(--fs-sm); font-weight: 700; color: var(--ink-400);
+  margin: var(--sp-6) 0 var(--sp-3); padding-top: var(--sp-5);
+  border-top: 1px dashed var(--ink-200);
+}
+.check-row, .switch-row {
+  display: flex; align-items: center; gap: var(--sp-3);
+  padding: var(--sp-3); border: 1px solid var(--ink-200);
+  border-radius: var(--r-md); margin-bottom: var(--sp-3);
+  font-size: var(--fs-sm); color: var(--ink-700);
+}
+.check-row input { accent-color: var(--brand-500); width: 16px; height: 16px; }
+.switch {
+  margin-left: auto; width: 36px; height: 20px; border-radius: 100px;
+  background: var(--ink-200); position: relative; flex-shrink: 0;
+}
+.switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%; background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ========== 个人中心 ========== */
+.me-layout {
+  display: grid; grid-template-columns: 280px 1fr;
+  gap: var(--sp-6); align-items: start;
+  padding-bottom: var(--sp-16);
+}
+.me-card {
+  background: #fff; border: 1px solid var(--ink-200);
+  border-radius: var(--r-xl); padding: var(--sp-8) var(--sp-6);
+  text-align: center; position: sticky; top: 84px;
+}
+.me-card__avatar {
+  width: 88px; height: 88px; border-radius: 50%;
+  background: var(--grad-brand);
+  display: grid; place-items: center;
+  margin: 0 auto var(--sp-4); color: #fff;
+  box-shadow: var(--shadow-md);
+}
+.me-card__name { font-size: var(--fs-2xl); font-weight: 800; color: var(--ink-900); }
+.me-card__join { font-size: var(--fs-xs); color: var(--ink-400); margin-top: var(--sp-2); }
+.me-card__stats {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  margin-top: var(--sp-6); padding-top: var(--sp-5);
+  border-top: 1px solid var(--ink-100);
+}
+.me-card__stat-value { font-size: var(--fs-2xl); font-weight: 800; color: var(--ink-900); }
+.me-card__stat-label { font-size: var(--fs-xs); color: var(--ink-400); }
+.tabs {
+  display: flex; gap: var(--sp-1);
+  border-bottom: 1px solid var(--ink-200);
+  margin-bottom: var(--sp-6);
+}
+.tab {
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-md); font-weight: 600;
+  color: var(--ink-500); cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab--active { color: var(--brand-600); border-bottom-color: var(--brand-500); }
+.me-doc {
+  background: #fff; border: 1px solid var(--ink-200);
+  border-radius: var(--r-lg); padding: var(--sp-4) var(--sp-5);
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: var(--sp-3); transition: all .18s var(--ease-out);
+}
+.me-doc:hover { border-color: var(--brand-200); box-shadow: var(--shadow-sm); }
+.me-doc__title { font-weight: 600; color: var(--ink-900); font-size: var(--fs-md); }
+.me-doc__meta { display: flex; gap: var(--sp-2); align-items: center; margin-top: 4px; font-size: var(--fs-xs); color: var(--ink-400); }
+.me-doc__actions { display: flex; gap: var(--sp-3); opacity: 0; transition: opacity .15s; }
+.me-doc:hover .me-doc__actions { opacity: 1; }
+.me-doc__action { font-size: var(--fs-sm); color: var(--ink-500); cursor: pointer; }
+.me-doc__action:hover { color: var(--brand-600); }
+.me-panel {
+  background: #fff; border: 1px solid var(--ink-200);
+  border-radius: var(--r-xl); padding: var(--sp-6);
+  margin-top: var(--sp-8);
+}
+.me-panel__title { font-size: var(--fs-lg); font-weight: 700; color: var(--ink-900); margin-bottom: var(--sp-5); }
+
+/* ========== 编辑器 ========== */
+.editor__topbar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: var(--sp-6) 0 var(--sp-4);
+}
+.editor__back {
+  display: inline-flex; align-items: center; gap: var(--sp-1);
+  color: var(--ink-500); font-size: var(--fs-md); cursor: pointer;
+}
+.editor__back:hover { color: var(--brand-600); }
+.editor__title-input {
+  width: 100%; border: none; outline: none; background: transparent;
+  font-size: var(--fs-4xl); font-weight: 800; color: var(--ink-900);
+  padding: var(--sp-2) 0; letter-spacing: -.01em;
+}
+.editor__title-input::placeholder { color: var(--ink-300); }
+.editor__meta {
+  display: flex; gap: var(--sp-4); align-items: flex-end; flex-wrap: wrap;
+  margin-bottom: var(--sp-5);
+}
+.editor__meta .field { margin-bottom: 0; min-width: 180px; }
+.radio-cards { display: flex; gap: var(--sp-3); }
+.radio-card {
+  flex: 1; display: flex; gap: var(--sp-3);
+  border: 1px solid var(--ink-200); border-radius: var(--r-md);
+  padding: var(--sp-3); cursor: pointer; transition: all .15s var(--ease-out);
+  background: #fff;
+}
+.radio-card input { accent-color: var(--brand-500); margin-top: 3px; }
+.radio-card--checked { border-color: var(--brand-400); background: var(--brand-50); }
+.radio-card__name { font-size: var(--fs-sm); font-weight: 700; color: var(--ink-900); }
+.radio-card__desc { font-size: var(--fs-xs); color: var(--ink-500); margin-top: 2px; }
+.editor__alert {
+  display: flex; align-items: center; gap: var(--sp-3);
+  background: #FFFBEB; border: 1px solid #FDE68A;
+  color: #92400E; border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-sm); margin-bottom: var(--sp-4);
+}
+.editor__alert-btn { margin-left: auto; color: #B45309; font-weight: 700; font-size: var(--fs-sm); text-decoration: underline; cursor: pointer; flex-shrink: 0; }
+.editor__split {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4); align-items: stretch;
+}
+.editor__pane {
+  border-radius: var(--r-lg); overflow: hidden;
+  border: 1px solid var(--ink-200); background: #fff;
+  display: flex; flex-direction: column;
+}
+.editor__pane-head {
+  padding: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-xs); font-weight: 700; letter-spacing: .05em;
+  color: var(--ink-400); background: var(--ink-50);
+  border-bottom: 1px solid var(--ink-200);
+  text-transform: uppercase;
+}
+.editor__textarea {
+  flex: 1; min-height: 380px; border: none; outline: none; resize: none;
+  background: var(--ink-900); color: #E4E4E7;
+  padding: var(--sp-4); font-size: var(--fs-sm); line-height: 1.75;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+.editor__preview { padding: var(--sp-5); font-size: var(--fs-sm); color: var(--ink-700); line-height: 1.8; }
+.editor__tip {
+  margin: var(--sp-5) 0 var(--sp-16);
+  font-size: var(--fs-sm); color: var(--ink-500);
+  display: flex; align-items: center; gap: var(--sp-2);
+}
+
+/* ========== 管理后台 ========== */
+.admin {
+  display: grid; grid-template-columns: 220px 1fr;
+  min-height: calc(100vh - 68px);
+}
+.admin__sidebar {
+  background: var(--ink-900); color: var(--ink-300);
+  padding: var(--sp-6) var(--sp-3);
+}
+.admin__side-title {
+  font-size: var(--fs-xs); font-weight: 700; letter-spacing: .08em;
+  color: var(--ink-500); text-transform: uppercase;
+  padding: 0 var(--sp-3); margin-bottom: var(--sp-3);
+}
+.admin__side-item {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm); color: var(--ink-400);
+  cursor: pointer; margin-bottom: 2px;
+  border-left: 3px solid transparent;
+  transition: all .15s var(--ease-out);
+}
+.admin__side-item:hover { color: var(--ink-100); background: rgba(255,255,255,.05); }
+.admin__side-item--active {
+  color: #fff; background: rgba(249,115,22,.14);
+  border-left-color: var(--brand-500);
+}
+.admin__main { padding: var(--sp-8); background: #FDFCFA; }
+.admin__title { font-size: var(--fs-3xl); font-weight: 800; color: var(--ink-900); margin-bottom: var(--sp-6); }
+.admin__stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-4); margin-bottom: var(--sp-6); }
+.admin__stat {
+  background: #fff; border: 1px solid var(--ink-200);
+  border-radius: var(--r-lg); padding: var(--sp-5);
+}
+.admin__stat-value { font-size: var(--fs-3xl); font-weight: 800; color: var(--ink-900); letter-spacing: -.02em; }
+.admin__stat-label { font-size: var(--fs-sm); color: var(--ink-500); margin-top: 2px; }
+.admin__stat-delta { font-size: var(--fs-xs); color: var(--success); font-weight: 600; margin-top: var(--sp-1); }
+.admin__stat-delta--warn { color: var(--warning); }
+.admin__grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
+.admin__panel {
+  background: #fff; border: 1px solid var(--ink-200);
+  border-radius: var(--r-xl); padding: var(--sp-5);
+}
+.admin__panel-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: var(--sp-4);
+}
+.admin__panel-title { font-size: var(--fs-lg); font-weight: 700; color: var(--ink-900); }
+.chart {
+  display: flex; align-items: flex-end; gap: var(--sp-2);
+  height: 140px; padding-top: var(--sp-3);
+}
+.chart__bar {
+  flex: 1; border-radius: 4px 4px 0 0;
+  background: linear-gradient(180deg, var(--brand-400) 0%, var(--brand-600) 100%);
+  min-height: 8px; cursor: pointer;
+  transition: filter .15s;
+}
+.chart__bar:hover { filter: brightness(1.15); }
+.admin__list-row {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: var(--sp-3); padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--ink-100);
+  font-size: var(--fs-sm);
+}
+.admin__list-row:last-child { border-bottom: none; }
+.admin__list-q { color: var(--ink-800); font-weight: 500; }
+.admin__list-meta { font-size: var(--fs-xs); color: var(--ink-400); margin-top: 2px; }
+.admin__link-btn { font-size: var(--fs-sm); color: var(--brand-600); font-weight: 600; cursor: pointer; flex-shrink: 0; }
+.admin__link-btn:hover { color: var(--brand-700); text-decoration: underline; }
+.admin__member { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) 0; }
+.admin__member-avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--grad-soft); border: 1px solid var(--brand-200);
+  display: grid; place-items: center; color: var(--brand-700);
+  font-size: var(--fs-sm); font-weight: 700; flex-shrink: 0;
+}
+.admin__member-name { font-size: var(--fs-sm); font-weight: 600; color: var(--ink-900); }
+.admin__member-meta { font-size: var(--fs-xs); color: var(--ink-400); }
+
+/* ========== View Switch (原型交互) ========== */
+.view { display: none; }
+.view.is-active { display: block; }
+
+/* ========== 新页面响应式 ========== */
+@media (max-width: 900px) {
+  .kb-layout, .me-layout, .admin { grid-template-columns: 1fr; }
+  .kb-tree, .me-card { position: static; }
+  .doc-grid, .rec-grid, .editor__split, .admin__grid { grid-template-columns: 1fr; }
+  .admin__stats { grid-template-columns: repeat(2, 1fr); }
+  .admin__sidebar { display: flex; overflow-x: auto; padding: var(--sp-3); gap: var(--sp-1); }
+  .admin__side-title { display: none; }
+  .admin__side-item { border-left: none; white-space: nowrap; margin-bottom: 0; }
+  .admin__side-item--active { border-bottom: 2px solid var(--brand-500); }
+  .doc-hero { flex-direction: column; }
+  .editor__meta { flex-direction: column; align-items: stretch; }
+}
+</style>
+</head>
+<body>
+
+<!-- ==================== 导航栏 ==================== -->
+<nav class="nav">
+  <div class="container nav__inner">
+    <div class="nav__brand">
+      <div class="nav__brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="none">
+          <path d="M4 4h16v4H4V4zm0 8h10v8H4v-8zm12 0h4v8h-4v-8z" fill="#fff"/>
+        </svg>
+      </div>
+      <div class="nav__brand-name">Spring<span>KB</span></div>
+    </div>
+    <div class="nav__links">
+      <a class="nav__link nav__link--active" href="#home" data-view="home">首页</a>
+      <a class="nav__link" href="#qa" data-view="qa">问答</a>
+      <a class="nav__link" href="#kb" data-view="kb">知识库</a>
+    </div>
+    <div class="nav__actions">
+      <button class="btn btn--ghost">登录</button>
+      <button class="btn btn--primary" onclick="switchView('setup')">免费开始</button>
+      <div class="user-menu">
+        <button class="user-menu__avatar" title="账户">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </button>
+        <div class="user-menu__dropdown">
+          <div class="user-menu__header">
+            <div class="user-menu__name">张同学 <span class="badge--admin">admin</span></div>
+            <div class="user-menu__ws">SpringKB 团队</div>
+          </div>
+          <a class="user-menu__item" href="#" onclick="switchView('me'); return false;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            个人中心
+          </a>
+          <a class="user-menu__item" href="#" onclick="switchView('editor'); return false;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            写文档
+          </a>
+          <a class="user-menu__item" href="#" onclick="switchView('me'); return false;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            我的收藏
+          </a>
+          <div class="user-menu__divider"></div>
+          <a class="user-menu__item" href="#" onclick="switchView('admin'); return false;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82.33l.06.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0 .33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            管理后台
+          </a>
+          <a class="user-menu__item" href="#">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            退出登录
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- ==================== 首页 Hero + 统计 + 产品线 ==================== -->
+<div class="view is-active" id="view-home">
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero__inner">
+    <div class="hero__badge">
+      <span class="hero__badge-dot"></span>
+      235 篇官方文档 · 24h 前更新
+    </div>
+    <h1 class="hero__title">
+      让技术文档<br><em>开口说话</em>
+    </h1>
+    <p class="hero__desc">
+      整合 Spring Boot、Spring AI、Vue 等主流框架官方文档，<br>
+      自然语言问答 · 精准引用溯源 · 中英文双语匹配
+    </p>
+    <div class="hero__search">
+      <svg class="hero__search-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input class="hero__search-input" placeholder="试试：在 Spring Boot 中如何配置 CDS？">
+      <button class="hero__search-btn" onclick="switchView('qa')">开始问答</button>
+    </div>
+    <div class="hero__chips">
+      <span class="chip" onclick="switchView('qa')">Spring AI ChatClient 怎么用？</span>
+      <span class="chip" onclick="switchView('qa')">Vue 3 的 createApp 做什么的？</span>
+      <span class="chip" onclick="switchView('qa')">Actuator 有哪些端点？</span>
+      <span class="chip" onclick="switchView('qa')">如何配置数据源？</span>
+    </div>
+  </div>
+</section>
+
+<!-- Stats -->
+<section class="stats">
+  <div class="container stats__grid">
+    <div class="stat">
+      <div class="stat__value">235</div>
+      <div class="stat__label">官方文档</div>
+      <div class="stat__delta">↑ 本月 +42</div>
+    </div>
+    <div class="stat">
+      <div class="stat__value">854</div>
+      <div class="stat__label">知识片段</div>
+      <div class="stat__delta">↑ 本月 +128</div>
+    </div>
+    <div class="stat">
+      <div class="stat__value">3</div>
+      <div class="stat__label">产品线覆盖</div>
+      <div class="stat__delta">Spring 全家桶</div>
+    </div>
+    <div class="stat">
+      <div class="stat__value">94%</div>
+      <div class="stat__label">引用命中率</div>
+      <div class="stat__delta">来源可溯源</div>
+    </div>
+  </div>
+</section>
+
+<!-- Products -->
+<section class="section">
+  <div class="container">
+    <div class="section__header">
+      <div>
+        <h2 class="section__title">覆盖主流技术栈</h2>
+        <p class="section__subtitle">精选官方案例，持续更新</p>
+      </div>
+      <a class="section__link" href="#kb" data-view="kb">
+        浏览全部
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      </a>
+    </div>
+    <div class="products">
+      <article class="product">
+        <div class="product__cta">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
+        <div class="product__icon product__icon--orange">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>
+        </div>
+        <h3 class="product__title">Spring Boot</h3>
+        <p class="product__desc">从自动配置到 Actuator，从数据源到安全框架，覆盖生产环境常见场景。</p>
+        <div class="product__meta">
+          <span class="product__meta-item"><span class="product__meta-value">73</span> 篇文档</span>
+          <span class="product__meta-item"><span class="product__meta-value">4.2-SNAPSHOT</span> 最新</span>
+        </div>
+      </article>
+      <article class="product">
+        <div class="product__cta">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
+        <div class="product__icon product__icon--blue">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a10 10 0 1 0 10 10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v4"/></svg>
+        </div>
+        <h3 class="product__title">Spring AI</h3>
+        <p class="product__desc">ChatClient、Embedding、RAG 全链路封装，快速构建企业级 AI 应用。</p>
+        <div class="product__meta">
+          <span class="product__meta-item"><span class="product__meta-value">80</span> 篇文档</span>
+          <span class="product__meta-item"><span class="product__meta-value">latest</span> 最新</span>
+        </div>
+      </article>
+      <article class="product">
+        <div class="product__cta">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
+        <div class="product__icon product__icon--green">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v4H4V4zm0 8h16v8H4v-8z"/><path d="M8 12v8"/><path d="M16 12v8"/></svg>
+        </div>
+        <h3 class="product__title">Vue 3</h3>
+        <p class="product__desc">Composition API、响应式原理、生态工具链，前端开发一站式参考。</p>
+        <div class="product__meta">
+          <span class="product__meta-item"><span class="product__meta-value">80</span> 篇文档</span>
+          <span class="product__meta-item"><span class="product__meta-value">3.x</span> 最新</span>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="section section--alt">
+  <div class="container">
+    <div class="section__header">
+      <div>
+        <h2 class="section__title">企业级 RAG 能力</h2>
+        <p class="section__subtitle">不止是搜索，更要可解释、可追溯、可迭代</p>
+      </div>
+    </div>
+    <div class="features">
+      <div class="feature">
+        <div class="feature__icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <div>
+          <h3 class="feature__title">自然语言问答</h3>
+          <p class="feature__desc">用日常说话的方式提问，系统自动理解意图、检索最相关的知识片段，生成可直接使用的答案。</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature__icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        </div>
+        <div>
+          <h3 class="feature__title">引用可溯源</h3>
+          <p class="feature__desc">每段答案都标注来源文档、章节、原文片段，点击即可跳转，不再担心 AI 幻觉。</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature__icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </div>
+        <div>
+          <h3 class="feature__title">多语言支持</h3>
+          <p class="feature__desc">中英双语提问都能准确检索。中文问法匹配英文文档，借助多语言向量模型实现跨语言语义理解。</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature__icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+        </div>
+        <div>
+          <h3 class="feature__title">知识盲区发现</h3>
+          <p class="feature__desc">自动统计高频兜底问题，帮助团队识别知识库薄弱环节——"用户问了但我们答不出来"就是下一个该补的方向。</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature__icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <div>
+          <h3 class="feature__title">私有化部署与权限</h3>
+          <p class="feature__desc">单实例单团队，隔离在部署边界（同 GitLab / Gitea）。admin / member 两角色 + 文档团队 / 私有两级可见；发布前密钥扫描防泄露。</p>
+        </div>
+      </div>
+      <div class="feature">
+        <div class="feature__icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m3.343-5.657-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386z"/></svg>
+        </div>
+        <div>
+          <h3 class="feature__title">智能推荐</h3>
+          <p class="feature__desc">基于向量相似度的关联文档推荐——读完一篇自动推荐同领域相关内容；问答后推荐追问方向，让知识探索不断链。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<!-- ==================== 问答页 ==================== -->
+<div class="view" id="view-qa">
+  <section style="padding: var(--sp-12) 0 var(--sp-16); background: #FDFCFA;">
+    <div class="container" style="max-width: 760px;">
+      <div style="text-align: center; margin-bottom: var(--sp-8);">
+        <h2 style="font-size: var(--fs-4xl); font-weight: 800; color: var(--ink-900);">智能问答</h2>
+        <p style="color: var(--ink-500); margin-top: var(--sp-2);">自然语言提问，精准引用溯源</p>
+      </div>
+      <!-- 问答框 -->
+      <div style="background: #fff; border: 1px solid var(--ink-200); border-radius: var(--r-xl); padding: var(--sp-4); box-shadow: var(--shadow-lg); margin-bottom: var(--sp-8);">
+        <textarea placeholder="输入你的问题..." rows="2" style="width: 100%; border: none; outline: none; font-size: var(--fs-lg); resize: none; font-family: inherit; color: var(--ink-800);"></textarea>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: var(--sp-3); border-top: 1px solid var(--ink-100);">
+          <div style="display: flex; gap: var(--sp-2);">
+            <select style="border: 1px solid var(--ink-200); border-radius: var(--r-md); padding: var(--sp-1) var(--sp-2); font-size: var(--fs-sm); color: var(--ink-600); background: #fff;">
+              <option>全部版本</option>
+              <option>Spring Boot 4.2-SNAPSHOT</option>
+              <option>Spring AI latest</option>
+              <option>Vue 3.x</option>
+            </select>
+          </div>
+          <button class="btn btn--primary">
+            发送
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- 回答示例 -->
+      <div style="background: #fff; border: 1px solid var(--ink-200); border-radius: var(--r-xl); padding: var(--sp-8); margin-bottom: var(--sp-6);">
+        <div style="display: flex; gap: var(--sp-3); margin-bottom: var(--sp-5);">
+          <div style="width: 36px; height: 36px; border-radius: var(--r-md); background: var(--grad-brand); display: grid; place-items: center; color: #fff; font-weight: 700; font-size: var(--fs-lg); flex-shrink: 0;">S</div>
+          <div>
+            <div style="font-weight: 700; color: var(--ink-900);">在 Spring Boot 中如何配置 CDS？</div>
+            <div style="font-size: var(--fs-sm); color: var(--ink-400); margin-top: 2px;">2026-10-20 · 耗时 2.3s</div>
+          </div>
+        </div>
+        <div style="color: var(--ink-700); line-height: 1.8; font-size: var(--fs-md);">
+          <p>在 Spring Boot 4.2 中，CDS（Class Data Sharing）可以通过以下方式启用 <sup style="background: var(--brand-50); color: var(--brand-700); padding: 1px 6px; border-radius: 4px; font-size: var(--fs-xs); cursor: pointer;">[1]</sup>：</p>
+          <ol style="padding-left: var(--sp-6); margin: var(--sp-3) 0;">
+            <li>在 <code style="background: var(--ink-100); padding: 2px 6px; border-radius: 4px; font-size: var(--fs-sm);">application.properties</code> 中设置 <code style="background: var(--ink-100); padding: 2px 6px; border-radius: 4px; font-size: var(--fs-sm);">spring.boot.cds=true</code></li>
+            <li>执行 <code style="background: var(--ink-100); padding: 2px 6px; border-radius: 4px; font-size: var(--fs-sm);">java -XX:+AutoCreateSharedArchive</code> 生成共享归档</li>
+            <li>下次启动时 JVM 会自动加载共享归档文件</li>
+          </ol>
+          <p style="margin-top: var(--sp-3);">CDS 能显著缩短 Spring Boot 应用的启动时间，特别是在容器环境中 <sup style="background: var(--brand-50); color: var(--brand-700); padding: 1px 6px; border-radius: 4px; font-size: var(--fs-xs); cursor: pointer;">[1]</sup>。</p>
+        </div>
+      </div>
+
+      <!-- 来源卡片 -->
+      <div>
+        <div style="font-size: var(--fs-sm); font-weight: 600; color: var(--ink-500); margin-bottom: var(--sp-3); text-transform: uppercase; letter-spacing: .05em;">引用来源（1）</div>
+        <div style="background: #fff; border: 1px solid var(--ink-200); border-radius: var(--r-xl); padding: var(--sp-5); transition: all .2s; cursor: pointer;" onmouseover="this.style.borderColor='var(--brand-300)'" onmouseout="this.style.borderColor='var(--ink-200)'">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--sp-3);">
+            <div style="display: flex; gap: var(--sp-2); align-items: center;">
+              <span style="background: var(--brand-500); color: #fff; font-size: var(--fs-xs); font-weight: 700; padding: 2px 8px; border-radius: 4px;">1</span>
+              <span style="background: #F0FDF4; color: #16A34A; font-size: var(--fs-xs); font-weight: 600; padding: 2px 8px; border-radius: 4px;">官方</span>
+              <span style="background: var(--ink-100); color: var(--ink-500); font-size: var(--fs-xs); font-weight: 500; padding: 2px 8px; border-radius: 4px;">4.2-SNAPSHOT</span>
+            </div>
+            <button style="font-size: var(--fs-sm); color: var(--brand-600); font-weight: 600; display: inline-flex; align-items: center; gap: 4px;">
+              查看原文
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>
+            </button>
+          </div>
+          <div style="font-weight: 700; color: var(--ink-900); font-size: var(--fs-lg); margin-bottom: var(--sp-1);">Actuator</div>
+          <div style="font-size: var(--fs-sm); color: var(--ink-400); margin-bottom: var(--sp-3);">来源：spring.io · 3 个匹配片段 · 相似度 87%</div>
+          <div style="background: #FDFCFA; border-radius: var(--r-md); padding: var(--sp-3); font-size: var(--fs-sm); color: var(--ink-600); border-left: 3px solid var(--brand-400);">
+            CDS 配置属性可以通过 <code style="background: #fff; padding: 1px 4px; border-radius: 3px; font-size: var(--fs-xs);">spring.boot.cds</code> 前缀进行自定义，默认开启后 JVM 会自动在应用关闭时生成共享归档文件...
+          </div>
+        </div>
+      </div>
+
+      <!-- 相关推荐（智能推荐） -->
+      <div style="margin-top: var(--sp-8);">
+        <div style="display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-sm); font-weight: 600; color: var(--ink-500); margin-bottom: var(--sp-3); text-transform: uppercase; letter-spacing: .05em;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-500);"><path d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m3.343-5.657-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386z"/></svg>
+          相关推荐
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3);">
+          <div style="background: #fff; border: 1px solid var(--ink-200); border-radius: var(--r-lg); padding: var(--sp-4); cursor: pointer; transition: all .2s;" onmouseover="this.style.borderColor='var(--brand-300)'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--ink-200)'; this.style.transform=''">
+            <div style="font-size: var(--fs-xs); color: var(--brand-600); font-weight: 600; margin-bottom: var(--sp-1);">Spring Boot · 官方</div>
+            <div style="font-size: var(--fs-md); font-weight: 600; color: var(--ink-900); line-height: 1.4;">应用性能监控最佳实践</div>
+            <div style="font-size: var(--fs-xs); color: var(--ink-400); margin-top: var(--sp-1);">相似度 82%</div>
+          </div>
+          <div style="background: #fff; border: 1px solid var(--ink-200); border-radius: var(--r-lg); padding: var(--sp-4); cursor: pointer; transition: all .2s;" onmouseover="this.style.borderColor='var(--brand-300)'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--ink-200)'; this.style.transform=''">
+            <div style="font-size: var(--fs-xs); color: var(--brand-600); font-weight: 600; margin-bottom: var(--sp-1);">Spring Boot · 官方</div>
+            <div style="font-size: var(--fs-md); font-weight: 600; color: var(--ink-900); line-height: 1.4;">容器化部署启动优化</div>
+            <div style="font-size: var(--fs-xs); color: var(--ink-400); margin-top: var(--sp-1);">相似度 78%</div>
+          </div>
+          <div style="background: #fff; border: 1px solid var(--ink-200); border-radius: var(--r-lg); padding: var(--sp-4); cursor: pointer; transition: all .2s;" onmouseover="this.style.borderColor='var(--brand-300)'; this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='var(--ink-200)'; this.style.transform=''">
+            <div style="font-size: var(--fs-xs); color: var(--brand-600); font-weight: 600; margin-bottom: var(--sp-1);">Spring Boot · 社区</div>
+            <div style="font-size: var(--fs-md); font-weight: 600; color: var(--ink-900); line-height: 1.4;">JVM 启动参数调优 FAQ</div>
+            <div style="font-size: var(--fs-xs); color: var(--ink-400); margin-top: var(--sp-1);">相似度 74%</div>
+          </div>
+        </div>
+        <!-- 追问建议 -->
+        <div style="display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-top: var(--sp-4);">
+          <span style="font-size: var(--fs-sm); color: var(--ink-500); padding: 7px 0;">继续追问：</span>
+          <span class="chip">CDS 对启动时间能提升多少？</span>
+          <span class="chip">与 AOT 编译有什么区别？</span>
+          <span class="chip">生产环境如何验证 CDS 生效？</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ==================== 知识库页 ==================== -->
+<div class="view" id="view-kb">
+  <section style="padding-top: var(--sp-12); background: #FDFCFA;">
+    <div class="container">
+      <div class="page-head" style="padding-top: 0;">
+        <h2 class="page-head__title">知识库</h2>
+        <p class="page-head__sub">按产品线 · 版本 · 来源浏览全部已收录文档</p>
+      </div>
+      <div class="kb-layout">
+        <!-- 左侧体系树 -->
+        <aside class="kb-tree">
+          <input class="kb-tree__search" placeholder="筛选文档标题...">
+          <details open>
+            <summary>Spring Boot</summary>
+            <div class="kb-tree__group">
+              <details open>
+                <summary style="font-weight: 500;">4.2-SNAPSHOT</summary>
+                <div class="kb-tree__group">
+                  <div class="kb-tree__leaf kb-tree__leaf--active">官方文档 <span class="kb-tree__count">71</span></div>
+                  <div class="kb-tree__leaf">社区问答 <span class="kb-tree__count">2</span></div>
+                </div>
+              </details>
+              <details>
+                <summary style="font-weight: 500;">3.3</summary>
+                <div class="kb-tree__group">
+                  <div class="kb-tree__leaf">官方文档 <span class="kb-tree__count">待补充</span></div>
+                </div>
+              </details>
+            </div>
+          </details>
+          <details>
+            <summary>Spring AI</summary>
+            <div class="kb-tree__group">
+              <details>
+                <summary style="font-weight: 500;">latest</summary>
+                <div class="kb-tree__group">
+                  <div class="kb-tree__leaf">官方文档 <span class="kb-tree__count">80</span></div>
+                </div>
+              </details>
+            </div>
+          </details>
+          <details>
+            <summary>Vue</summary>
+            <div class="kb-tree__group">
+              <details>
+                <summary style="font-weight: 500;">3.x</summary>
+                <div class="kb-tree__group">
+                  <div class="kb-tree__leaf">官方文档 <span class="kb-tree__count">78</span></div>
+                  <div class="kb-tree__leaf">社区问答 <span class="kb-tree__count">2</span></div>
+                </div>
+              </details>
+            </div>
+          </details>
+        </aside>
+        <!-- 右侧文档卡 -->
+        <div class="doc-grid">
+          <article class="doc-card" onclick="switchView('doc')">
+            <div class="doc-card__badges">
+              <span class="badge badge--official">官方</span>
+              <span class="badge badge--community">4.2-SNAPSHOT</span>
+            </div>
+            <div class="doc-card__title">Actuator · 监控端点</div>
+            <div class="doc-card__meta">Spring Boot · 12 个章节 · 128 片段</div>
+            <div class="doc-card__foot">
+              <span class="doc-card__stat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>18</span>
+              <span class="doc-card__stat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>6</span>
+            </div>
+          </article>
+          <article class="doc-card" onclick="switchView('doc')">
+            <div class="doc-card__badges">
+              <span class="badge badge--official">官方</span>
+              <span class="badge badge--community">latest</span>
+            </div>
+            <div class="doc-card__title">ChatClient · 对话客户端</div>
+            <div class="doc-card__meta">Spring AI · 8 个章节 · 96 片段</div>
+            <div class="doc-card__foot">
+              <span class="doc-card__stat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>24</span>
+              <span class="doc-card__stat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>11</span>
+            </div>
+          </article>
+          <article class="doc-card" onclick="switchView('doc')">
+            <div class="doc-card__badges">
+              <span class="badge badge--official">官方</span>
+              <span class="badge badge--community">3.x</span>
+            </div>
+            <div class="doc-card__title">Composition API · 组合式 API</div>
+            <div class="doc-card__meta">Vue 3 · 15 个章节 · 142 片段</div>
+            <div class="doc-card__foot">
+              <span class="doc-card__stat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>31</span>
+              <span class="doc-card__stat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>14</span>
+            </div>
+          </article>
+          <article class="doc-card" onclick="switchView('doc')">
+            <div class="doc-card__badges">
+              <span class="badge badge--community">社区</span>
+              <span class="badge badge--private">4.2-SNAPSHOT</span>
+            </div>
+            <div class="doc-card__title">StackOverflow · 常见问题汇总</div>
+            <div class="doc-card__meta">Spring Boot · 高分回答 · 58 片段</div>
+            <div class="doc-card__foot">
+              <span class="doc-card__stat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>9</span>
+              <span class="doc-card__stat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>3</span>
+            </div>
+          </article>
+          <article class="doc-card" onclick="switchView('doc')">
+            <div class="doc-card__badges">
+              <span class="badge badge--team">团队文档</span>
+              <span class="badge badge--private">内部</span>
+            </div>
+            <div class="doc-card__title">线上慢查询排查手册</div>
+            <div class="doc-card__meta">团队经验 · 张同学 · 24 片段</div>
+            <div class="doc-card__foot">
+              <span class="doc-card__stat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>15</span>
+              <span class="doc-card__stat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>8</span>
+            </div>
+          </article>
+          <article class="doc-card" onclick="switchView('doc')">
+            <div class="doc-card__badges">
+              <span class="badge badge--team">团队文档</span>
+              <span class="badge badge--private">内部</span>
+            </div>
+            <div class="doc-card__title">CI/CD 流水线接入指南</div>
+            <div class="doc-card__meta">团队经验 · 李同学 · 18 片段</div>
+            <div class="doc-card__foot">
+              <span class="doc-card__stat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>7</span>
+              <span class="doc-card__stat"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>2</span>
+            </div>
+          </article>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ==================== 文档详情页 ==================== -->
+<div class="view" id="view-doc">
+  <section style="padding: var(--sp-10) 0 var(--sp-16); background: #FDFCFA;">
+    <div class="container" style="max-width: 900px;">
+      <div class="crumb">
+        <a onclick="switchView('kb')">知识库</a>
+        <span>/</span>
+        <span>Spring Boot</span>
+        <span>/</span>
+        <span style="color: var(--ink-700);">Actuator</span>
+      </div>
+      <div class="doc-hero">
+        <div>
+          <h2 style="font-size: var(--fs-4xl); font-weight: 800; color: var(--ink-900);">Actuator · 监控端点</h2>
+          <div class="doc-hero__meta">
+            <span class="badge badge--community">4.2-SNAPSHOT</span>
+            <span>官方来源</span>
+            <span>收录于 2026-09</span>
+            <span class="badge badge--verified">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              已验证
+            </span>
+          </div>
+        </div>
+        <div class="doc-hero__actions">
+          <button class="btn btn--primary" onclick="switchView('qa')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            基于本文提问
+          </button>
+          <button class="btn btn--outline">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>
+            18
+          </button>
+          <button class="btn btn--outline">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+            6
+          </button>
+        </div>
+      </div>
+
+      <div class="doc-body">
+        <h3>什么是 Actuator</h3>
+        <p>Spring Boot Actuator 提供了一组生产就绪的特性，帮助你监控和管理应用。通过 HTTP 端点或 JMX，你可以获取应用的健康状况、指标、配置属性、环境变量等运行时信息。</p>
+        <h3>启用端点</h3>
+        <p>引入 <code>spring-boot-starter-actuator</code> 依赖后，默认只暴露 <code>/actuator/health</code>。可以通过配置开放更多端点：</p>
+        <pre><code>management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env
+  endpoint:
+    health:
+      show-details: when-authorized</code></pre>
+        <h3>常用端点一览</h3>
+        <ul>
+          <li><code>/actuator/health</code> — 应用健康状态，支持自定义 HealthIndicator</li>
+          <li><code>/actuator/metrics</code> — JVM、HTTP、数据源等指标体系</li>
+          <li><code>/actuator/env</code> — 当前生效的全部配置属性</li>
+          <li><code>/actuator/beans</code> — 容器中所有 Bean 及其依赖关系</li>
+        </ul>
+        <h3>生产环境安全建议</h3>
+        <p>Actuator 端点会暴露大量内部信息，生产环境务必结合 Spring Security 做访问控制，或将其挂在独立管理端口（<code>management.server.port</code>）并仅对内网开放。</p>
+        <a class="doc-src" href="#" onclick="return false;">
+          查看原始来源：docs.spring.io
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>
+        </a>
+      </div>
+
+      <div>
+        <div style="font-size: var(--fs-sm); font-weight: 600; color: var(--ink-500); margin-bottom: var(--sp-3); text-transform: uppercase; letter-spacing: .05em;">相关推荐</div>
+        <div class="rec-grid">
+          <div class="rec-card" onclick="switchView('doc')">
+            <div class="rec-card__tag">Spring Boot · 官方</div>
+            <div class="rec-card__title">应用性能监控最佳实践</div>
+            <div class="rec-card__meta">相似度 82%</div>
+          </div>
+          <div class="rec-card" onclick="switchView('doc')">
+            <div class="rec-card__tag">Spring Boot · 官方</div>
+            <div class="rec-card__title">Micrometer 指标接入 Prometheus</div>
+            <div class="rec-card__meta">相似度 79%</div>
+          </div>
+          <div class="rec-card" onclick="switchView('doc')">
+            <div class="rec-card__tag">团队文档</div>
+            <div class="rec-card__title">线上慢查询排查手册</div>
+            <div class="rec-card__meta">相似度 71%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ==================== 首次启动向导 ==================== -->
+<div class="view" id="view-setup">
+  <div class="setup">
+    <div class="setup__stack">
+      <div class="setup__ghost"></div>
+      <div class="setup__ghost setup__ghost--2"></div>
+      <div class="setup__card">
+        <div class="setup__logo">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="none"><path d="M4 4h16v4H4V4zm0 8h10v8H4v-8zm12 0h4v8h-4v-8z" fill="#fff"/></svg>
+        </div>
+        <div class="setup__title">欢迎使用 SpringKB</div>
+        <div class="setup__sub">三步完成团队知识库初始化</div>
+        <div class="setup__steps">
+          <div class="setup__step setup__step--active">
+            <div class="setup__step-dot">1</div>
+            <div class="setup__step-label">团队信息</div>
+          </div>
+          <div class="setup__step-line"></div>
+          <div class="setup__step">
+            <div class="setup__step-dot">2</div>
+            <div class="setup__step-label">管理员账号</div>
+          </div>
+          <div class="setup__step-line"></div>
+          <div class="setup__step">
+            <div class="setup__step-dot">3</div>
+            <div class="setup__step-label">初始设置</div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="field__label">团队名称</label>
+          <input class="field__input" placeholder="例如：后端平台组">
+        </div>
+        <div class="field">
+          <label class="field__label">实例描述（可选）</label>
+          <input class="field__input" placeholder="例如：组内 Spring / Vue 技术文档库">
+        </div>
+
+        <div class="setup__preview">
+          <div class="setup__preview-title">第 2 步 · 管理员账号（预览）</div>
+          <div class="field">
+            <label class="field__label">管理员用户名</label>
+            <input class="field__input" placeholder="admin" disabled>
+          </div>
+          <div class="field">
+            <label class="field__label">密码</label>
+            <input class="field__input" type="password" placeholder="••••••••" disabled>
+          </div>
+          <div class="field">
+            <label class="field__label">确认密码</label>
+            <input class="field__input" type="password" placeholder="••••••••" disabled>
+          </div>
+          <div class="setup__preview-title">第 3 步 · 初始设置（预览）</div>
+          <label class="check-row">
+            <input type="checkbox" checked disabled>
+            预置官方文档包（Spring Boot / Vue · 1500+ 篇）
+          </label>
+          <div class="switch-row">
+            允许未登录访问问答与知识库
+            <span class="switch"></span>
+          </div>
+        </div>
+
+        <button class="btn btn--primary" style="width: 100%; justify-content: center; margin-top: var(--sp-6);">
+          下一步
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 个人中心 ==================== -->
+<div class="view" id="view-me">
+  <section style="padding-top: var(--sp-12); background: #FDFCFA;">
+    <div class="container">
+      <div class="me-layout">
+        <!-- 左侧个人卡 -->
+        <aside class="me-card">
+          <div class="me-card__avatar">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div class="me-card__name">张同学</div>
+          <div style="margin-top: var(--sp-2);"><span class="badge--admin">admin</span></div>
+          <div class="me-card__join">2026-03 加入团队</div>
+          <div class="me-card__stats">
+            <div>
+              <div class="me-card__stat-value">12</div>
+              <div class="me-card__stat-label">文档</div>
+            </div>
+            <div>
+              <div class="me-card__stat-value">47</div>
+              <div class="me-card__stat-label">被引用</div>
+            </div>
+            <div>
+              <div class="me-card__stat-value">36</div>
+              <div class="me-card__stat-label">获赞</div>
+            </div>
+          </div>
+        </aside>
+        <!-- 右侧内容 -->
+        <div>
+          <div class="tabs">
+            <div class="tab tab--active">我的文档</div>
+            <div class="tab">我的收藏</div>
+            <div class="tab">账号设置</div>
+          </div>
+          <div class="me-doc">
+            <div>
+              <div class="me-doc__title">线上慢查询排查手册</div>
+              <div class="me-doc__meta">
+                <span class="badge badge--team">团队可见</span>
+                <span>更新于 2026-10-12</span>
+              </div>
+            </div>
+            <div class="me-doc__actions">
+              <span class="me-doc__action" onclick="switchView('editor')">编辑</span>
+              <span class="me-doc__action">删除</span>
+            </div>
+          </div>
+          <div class="me-doc">
+            <div>
+              <div class="me-doc__title">Spring AI RAG 接入笔记</div>
+              <div class="me-doc__meta">
+                <span class="badge badge--team">团队可见</span>
+                <span>更新于 2026-09-28</span>
+                <span class="badge badge--pending">待复审</span>
+              </div>
+            </div>
+            <div class="me-doc__actions">
+              <span class="me-doc__action" onclick="switchView('editor')">编辑</span>
+              <span class="me-doc__action">删除</span>
+            </div>
+          </div>
+          <div class="me-doc">
+            <div>
+              <div class="me-doc__title">本地开发环境搭建清单</div>
+              <div class="me-doc__meta">
+                <span class="badge badge--private">仅自己</span>
+                <span>更新于 2026-09-15</span>
+              </div>
+            </div>
+            <div class="me-doc__actions">
+              <span class="me-doc__action" onclick="switchView('editor')">编辑</span>
+              <span class="me-doc__action">删除</span>
+            </div>
+          </div>
+          <div class="me-doc">
+            <div>
+              <div class="me-doc__title">Redis 缓存设计踩坑记录</div>
+              <div class="me-doc__meta">
+                <span class="badge badge--team">团队可见</span>
+                <span>更新于 2026-08-30</span>
+              </div>
+            </div>
+            <div class="me-doc__actions">
+              <span class="me-doc__action" onclick="switchView('editor')">编辑</span>
+              <span class="me-doc__action">删除</span>
+            </div>
+          </div>
+
+          <!-- 账号设置（静态展示） -->
+          <div class="me-panel">
+            <div class="me-panel__title">账号设置</div>
+            <div class="field" style="max-width: 360px;">
+              <label class="field__label">显示名</label>
+              <input class="field__input" value="张同学">
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sp-3); max-width: 640px;">
+              <div class="field">
+                <label class="field__label">旧密码</label>
+                <input class="field__input" type="password" placeholder="••••••••">
+              </div>
+              <div class="field">
+                <label class="field__label">新密码</label>
+                <input class="field__input" type="password" placeholder="••••••••">
+              </div>
+              <div class="field">
+                <label class="field__label">确认新密码</label>
+                <input class="field__input" type="password" placeholder="••••••••">
+              </div>
+            </div>
+            <button class="btn btn--primary">保存</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ==================== 写文档 ==================== -->
+<div class="view" id="view-editor">
+  <section style="background: #FDFCFA;">
+    <div class="container" style="max-width: 1100px;">
+      <div class="editor__topbar">
+        <span class="editor__back" onclick="switchView('me')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+          返回
+        </span>
+        <span style="font-size: var(--fs-lg); font-weight: 700; color: var(--ink-900);">写文档</span>
+        <button class="btn btn--primary">发布</button>
+      </div>
+      <input class="editor__title-input" placeholder="输入文档标题..." value="线上慢查询排查手册">
+      <div class="editor__meta">
+        <div class="field">
+          <label class="field__label">产品线</label>
+          <select class="field__select">
+            <option>Spring Boot</option>
+            <option>Spring AI</option>
+            <option>Vue</option>
+            <option selected>团队经验</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field__label">版本</label>
+          <select class="field__select">
+            <option>4.2-SNAPSHOT</option>
+            <option>3.3</option>
+            <option>latest</option>
+            <option selected>通用</option>
+          </select>
+        </div>
+        <div class="field" style="flex: 1; min-width: 320px;">
+          <label class="field__label">可见性</label>
+          <div class="radio-cards">
+            <label class="radio-card radio-card--checked">
+              <input type="radio" name="vis" checked>
+              <span>
+                <span class="radio-card__name">团队可见（推荐）</span>
+                <span class="radio-card__desc" style="display: block;">团队所有成员可检索到</span>
+              </span>
+            </label>
+            <label class="radio-card">
+              <input type="radio" name="vis">
+              <span>
+                <span class="radio-card__name">仅自己</span>
+                <span class="radio-card__desc" style="display: block;">仅自己可见可检索</span>
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="editor__alert">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        检测到疑似 API Key（第 12 行），发布后将被检索，请确认已脱敏
+        <span class="editor__alert-btn">仍要发布</span>
+      </div>
+      <div class="editor__split">
+        <div class="editor__pane">
+          <div class="editor__pane-head">Markdown</div>
+          <textarea class="editor__textarea"># 线上慢查询排查手册
+
+## 1. 定位慢 SQL
+
+开启慢查询日志：
+
+```properties
+spring.datasource.url=jdbc:mysql://db:3306/app
+logging.level.org.hibernate.SQL=DEBUG
+```
+
+## 2. 常见原因
+
+- 缺少索引（全表扫描）
+- N+1 查询问题
+- 大分页深度翻页
+
+## 3. 处置流程
+
+先用 EXPLAIN 看执行计划，再决定是否加索引或改写 SQL。</textarea>
+        </div>
+        <div class="editor__pane">
+          <div class="editor__pane-head">实时预览</div>
+          <div class="editor__preview">
+            <h3 style="font-size: var(--fs-xl); color: var(--ink-900); margin-bottom: var(--sp-3);">线上慢查询排查手册</h3>
+            <p style="font-weight: 700; color: var(--ink-800); margin-bottom: var(--sp-2);">1. 定位慢 SQL</p>
+            <p style="margin-bottom: var(--sp-3);">开启慢查询日志：</p>
+            <pre style="background: var(--ink-900); color: var(--ink-100); border-radius: var(--r-md); padding: var(--sp-3); font-size: var(--fs-xs); line-height: 1.7; margin-bottom: var(--sp-3); overflow-x: auto;"><code>spring.datasource.url=jdbc:mysql://db:3306/app
+logging.level.org.hibernate.SQL=DEBUG</code></pre>
+            <p style="font-weight: 700; color: var(--ink-800); margin-bottom: var(--sp-2);">2. 常见原因</p>
+            <ul style="padding-left: var(--sp-5); margin-bottom: var(--sp-3);">
+              <li>缺少索引（全表扫描）</li>
+              <li>N+1 查询问题</li>
+              <li>大分页深度翻页</li>
+            </ul>
+            <p style="font-weight: 700; color: var(--ink-800); margin-bottom: var(--sp-2);">3. 处置流程</p>
+            <p>先用 EXPLAIN 看执行计划，再决定是否加索引或改写 SQL。</p>
+          </div>
+        </div>
+      </div>
+      <div class="editor__tip">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--brand-500); flex-shrink: 0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        发布后文档将进入团队检索，权威性权重低于官方文档。
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ==================== 管理后台 ==================== -->
+<div class="view" id="view-admin">
+  <div class="admin">
+    <aside class="admin__sidebar">
+      <div class="admin__side-title">管理后台</div>
+      <div class="admin__side-item admin__side-item--active">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+        概览
+      </div>
+      <div class="admin__side-item">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        成员管理
+      </div>
+      <div class="admin__side-item">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        文档管理
+      </div>
+      <div class="admin__side-item">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        问答统计
+      </div>
+      <div class="admin__side-item">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        知识盲区
+      </div>
+      <div class="admin__side-item">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        待复审
+      </div>
+      <div class="admin__side-item">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        数据导入
+      </div>
+    </aside>
+    <main class="admin__main">
+      <div class="admin__title">概览</div>
+      <div class="admin__stats">
+        <div class="admin__stat">
+          <div class="admin__stat-value">1,535</div>
+          <div class="admin__stat-label">总文档</div>
+          <div class="admin__stat-delta">↑ 本周 +23</div>
+        </div>
+        <div class="admin__stat">
+          <div class="admin__stat-value">892</div>
+          <div class="admin__stat-label">本月问答</div>
+          <div class="admin__stat-delta">↑ 环比 +12%</div>
+        </div>
+        <div class="admin__stat">
+          <div class="admin__stat-value">94.2%</div>
+          <div class="admin__stat-label">命中率</div>
+          <div class="admin__stat-delta">↑ +0.8pt</div>
+        </div>
+        <div class="admin__stat">
+          <div class="admin__stat-value">12</div>
+          <div class="admin__stat-label">待复审</div>
+          <div class="admin__stat-delta admin__stat-delta--warn">3 篇超期</div>
+        </div>
+      </div>
+      <div class="admin__grid">
+        <div class="admin__panel">
+          <div class="admin__panel-head">
+            <div class="admin__panel-title">问答命中率趋势</div>
+            <span style="font-size: var(--fs-xs); color: var(--ink-400);">近 12 周</span>
+          </div>
+          <div class="chart">
+            <div class="chart__bar" style="height: 62%;" title="W1 · 88.1%"></div>
+            <div class="chart__bar" style="height: 66%;" title="W2 · 89.0%"></div>
+            <div class="chart__bar" style="height: 59%;" title="W3 · 86.5%"></div>
+            <div class="chart__bar" style="height: 71%;" title="W4 · 90.2%"></div>
+            <div class="chart__bar" style="height: 68%;" title="W5 · 89.6%"></div>
+            <div class="chart__bar" style="height: 75%;" title="W6 · 91.3%"></div>
+            <div class="chart__bar" style="height: 72%;" title="W7 · 90.8%"></div>
+            <div class="chart__bar" style="height: 79%;" title="W8 · 92.4%"></div>
+            <div class="chart__bar" style="height: 83%;" title="W9 · 93.1%"></div>
+            <div class="chart__bar" style="height: 81%;" title="W10 · 92.7%"></div>
+            <div class="chart__bar" style="height: 88%;" title="W11 · 93.8%"></div>
+            <div class="chart__bar" style="height: 92%;" title="W12 · 94.2%"></div>
+          </div>
+        </div>
+        <div class="admin__panel">
+          <div class="admin__panel-head">
+            <div class="admin__panel-title">知识盲区 Top 5</div>
+          </div>
+          <div class="admin__list-row">
+            <div>
+              <div class="admin__list-q">如何配置分布式事务？</div>
+              <div class="admin__list-meta">被问 15 次 · 命中率 0%</div>
+            </div>
+            <span class="admin__link-btn" onclick="switchView('editor')">安排撰写</span>
+          </div>
+          <div class="admin__list-row">
+            <div>
+              <div class="admin__list-q">WebFlux 与 MVC 如何选型？</div>
+              <div class="admin__list-meta">被问 11 次 · 命中率 32%</div>
+            </div>
+            <span class="admin__link-btn" onclick="switchView('editor')">安排撰写</span>
+          </div>
+          <div class="admin__list-row">
+            <div>
+              <div class="admin__list-q">生产环境如何做灰度发布？</div>
+              <div class="admin__list-meta">被问 9 次 · 命中率 18%</div>
+            </div>
+            <span class="admin__link-btn" onclick="switchView('editor')">安排撰写</span>
+          </div>
+          <div class="admin__list-row">
+            <div>
+              <div class="admin__list-q">Spring AI 如何接入自部署模型？</div>
+              <div class="admin__list-meta">被问 8 次 · 命中率 41%</div>
+            </div>
+            <span class="admin__link-btn" onclick="switchView('editor')">安排撰写</span>
+          </div>
+          <div class="admin__list-row">
+            <div>
+              <div class="admin__list-q">Vue 3 大屏适配方案？</div>
+              <div class="admin__list-meta">被问 6 次 · 命中率 25%</div>
+            </div>
+            <span class="admin__link-btn" onclick="switchView('editor')">安排撰写</span>
+          </div>
+        </div>
+        <div class="admin__panel">
+          <div class="admin__panel-head">
+            <div class="admin__panel-title">待复审文档</div>
+            <span class="admin__link-btn">全部</span>
+          </div>
+          <div class="admin__list-row">
+            <div>
+              <div class="admin__list-q">Spring AI RAG 接入笔记</div>
+              <div class="admin__list-meta">超期 6 天 · owner 张同学</div>
+            </div>
+            <span class="admin__link-btn">提醒复审</span>
+          </div>
+          <div class="admin__list-row">
+            <div>
+              <div class="admin__list-q">CI/CD 流水线接入指南</div>
+              <div class="admin__list-meta">超期 3 天 · owner 李同学</div>
+            </div>
+            <span class="admin__link-btn">提醒复审</span>
+          </div>
+          <div class="admin__list-row">
+            <div>
+              <div class="admin__list-q">Redis 缓存设计踩坑记录</div>
+              <div class="admin__list-meta">超期 1 天 · owner 张同学</div>
+            </div>
+            <span class="admin__link-btn">提醒复审</span>
+          </div>
+        </div>
+        <div class="admin__panel">
+          <div class="admin__panel-head">
+            <div class="admin__panel-title">成员管理</div>
+            <button class="btn btn--primary" style="padding: 6px 14px; font-size: var(--fs-sm);">邀请成员</button>
+          </div>
+          <div class="admin__member">
+            <div class="admin__member-avatar">张</div>
+            <div style="flex: 1;">
+              <div class="admin__member-name">张同学 <span class="badge--admin">admin</span></div>
+              <div class="admin__member-meta">文档 12 篇</div>
+            </div>
+          </div>
+          <div class="admin__member">
+            <div class="admin__member-avatar">李</div>
+            <div style="flex: 1;">
+              <div class="admin__member-name">李同学 <span class="badge badge--private">member</span></div>
+              <div class="admin__member-meta">文档 8 篇</div>
+            </div>
+          </div>
+          <div class="admin__member">
+            <div class="admin__member-avatar">王</div>
+            <div style="flex: 1;">
+              <div class="admin__member-name">王同学 <span class="badge badge--private">member</span></div>
+              <div class="admin__member-meta">文档 5 篇</div>
+            </div>
+          </div>
+          <div class="admin__member">
+            <div class="admin__member-avatar">陈</div>
+            <div style="flex: 1;">
+              <div class="admin__member-name">陈同学 <span class="badge badge--private">member</span></div>
+              <div class="admin__member-meta">文档 2 篇</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ==================== Footer ==================== -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer__grid">
+      <div>
+        <div style="display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3);">
+          <div style="width: 28px; height: 28px; border-radius: var(--r-md); background: var(--grad-brand); display: grid; place-items: center;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M4 4h16v4H4V4zm0 8h10v8H4v-8zm12 0h4v8h-4v-8z"/></svg>
+          </div>
+          <div class="footer__brand-name">SpringKB</div>
+        </div>
+        <p class="footer__brand-desc">面向开发者的框架文档 RAG 搜索引擎。整合 Spring 全家桶、Vue 等主流框架官方文档，提供自然语言问答与精准溯源。</p>
+      </div>
+      <div>
+        <div class="footer__col-title">产品</div>
+        <ul class="footer__links">
+          <li class="footer__link">智能问答</li>
+          <li class="footer__link">知识库浏览</li>
+          <li class="footer__link"><a href="#" data-view="editor" style="color: inherit;">文档上传</a></li>
+          <li class="footer__link">私有化部署</li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer__col-title">技术</div>
+        <ul class="footer__links">
+          <li class="footer__link">RAG 架构</li>
+          <li class="footer__link">Embedding 模型</li>
+          <li class="footer__link">爬虫策略</li>
+          <li class="footer__link">GitHub</li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer__col-title">支持</div>
+        <ul class="footer__links">
+          <li class="footer__link">使用指南</li>
+          <li class="footer__link">API 文档</li>
+          <li class="footer__link">问题反馈</li>
+          <li class="footer__link">联系我们</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer__bottom">
+      <span>© 2026 SpringKB. 基于 Spring Boot + Spring AI + pgvector 构建</span>
+      <span>v2.0 · 原型 Demo</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ==================== 视图切换 JS ==================== -->
+<script>
+function switchView(name) {
+  // 非导航视图映射到最近的主导航项（doc→kb，其余不高亮导航）
+  var navMap = { doc: 'kb' };
+  var navTarget = navMap[name] || name;
+  // 更新导航 active（只作用于主导航链接）
+  document.querySelectorAll('.nav__link').forEach(a => {
+    a.classList.remove('nav__link--active');
+    if (a.dataset.view === navTarget && ['home','qa','kb'].indexOf(navTarget) !== -1) {
+      a.classList.add('nav__link--active');
+    }
+  });
+  // 切换视图
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('is-active'));
+  const target = document.getElementById('view-' + name);
+  if (target) target.classList.add('is-active');
+  // 滚动到顶部
+  window.scrollTo(0, 0);
+}
+// 导航点击
+document.querySelectorAll('[data-view]').forEach(el => {
+  el.addEventListener('click', (e) => {
+    e.preventDefault();
+    switchView(el.dataset.view);
+  });
+});
+</script>
+</body>
+</html>
+
