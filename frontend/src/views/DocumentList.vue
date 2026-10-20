@@ -48,9 +48,12 @@ onMounted(() => {
 })
 
 async function onToggleActive(doc: Document) {
+  // 提示文案必须用切换后的目标值：doc.active 在请求前仍是旧值，
+  // 直接用会导致「点开显示停用、点关显示启用」的反向提示
+  const target = !doc.active
   try {
     await store.toggleActive(doc)
-    ElMessage.success(`${doc.active ? '已启用' : '已停用'}：${doc.title}`)
+    ElMessage.success(`${target ? '已启用' : '已停用'}：${doc.title}`)
   } catch {
     /* 拦截器已提示 */
   }

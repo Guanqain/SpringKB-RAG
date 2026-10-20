@@ -103,6 +103,8 @@ curl -X POST http://localhost:8080/api/auth/register -H "Content-Type: applicati
 17. **百炼 Embedding 批量上限**：text-embedding-v4 单请求输入 ≤ **10 条**；超大文档必须分批，`EMBEDDING_BATCH_SIZE = 8` 留余量。
 18. **boost 是微调非覆盖**：community 相似度差 > 0.15 时 official 无法反超，属设计边界（vue reactive array 场景）。
 19. **PowerShell curl 传 JSON**：`-d '{"a":1}'` 的双引号会被吞导致 parse error；用 `--data-binary "@文件"` 传 JSON 文件，或 curl.exe 单独调用。
+20. **Docker Hub 国内直连超时**（registry-1.docker.io:443 无响应）：构建镜像连续失败先查 daemon 状态（`npipe dockerDesktopLinuxEngine` 连不上=Docker Desktop 未启动）再查网络；对策为 Dockerfile 基础镜像加 `dockerproxy.net` 前缀（标准 Docker Hub 代理，任意网络可用；已实测 busybox/node/maven 可拉取）。
+21. **受控 el-switch 提示文案**：异步切换反馈文案必须基于切换**目标值**/服务端返回值计算，读取操作前旧状态会导致「启用提示已停用」的反向提示（DocumentList.vue 已修复）。
 
 ## 8. 进度状态
 
@@ -123,4 +125,4 @@ curl -X POST http://localhost:8080/api/auth/register -H "Content-Type: applicati
 | 日期 | 日志文件 | 主题 |
 | --- | --- | --- |
 | 2026-10-19 | [devlog/2026-10-19.md](./docs/devlog/2026-10-19.md) | 认证壳子打通；文档爬虫（3 源 adapter）；kb_document 数据驱动修订 |
-| 2026-10-20 | [devlog/2026-10-20.md](./docs/devlog/2026-10-20.md) | Task 1 导入链路：分块器 + 幂等入库 + 测试门禁 + 文档同步 ｜ Task 5 真实数据灌库 + 三条验证用例（$ 转义 / 爬虫字段缺口 / 百炼批量上限 3 坑） ｜ **Task 6 管理接口 + 前端联调（active 双写、URL 白名单防 SSRF、前端版本动态化）** ｜ **Task 7 README 与架构图** |
+| 2026-10-20 | [devlog/2026-10-20.md](./docs/devlog/2026-10-20.md) | Task 1 导入链路：分块器 + 幂等入库 + 测试门禁 + 文档同步 ｜ Task 5 真实数据灌库 + 三条验证用例（$ 转义 / 爬虫字段缺口 / 百炼批量上限 3 坑） ｜ **Task 6 管理接口 + 前端联调（active 双写、URL 白名单防 SSRF、前端版本动态化、状态开关提示文案修复）** ｜ **Task 7 README 与架构图** ｜ **Task 8 Docker 一体化部署（dockerproxy 镜像源 + 8 项验收全过）** |

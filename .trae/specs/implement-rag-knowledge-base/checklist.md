@@ -43,7 +43,8 @@
 - [x] 问题背景、三能力设计验证、架构图、已知限制齐全
 
 ## Task 8 · Docker Compose 部署
-- [ ] app + postgres 一键启动，接口可访问
+- [x] app + postgres 一键启动，接口可访问
+- [x] Dockerfile 三阶段构建 + compose 一键启动验收通过（前端页面/静态资源/SPA 回退/注册/列表 235 篇/数据导入 8 项全过）
 
 ## Task 9 · 演示素材
 - [ ] 截图/录屏与面试话术就绪

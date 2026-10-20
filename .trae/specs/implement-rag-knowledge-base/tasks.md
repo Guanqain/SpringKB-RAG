@@ -65,9 +65,9 @@
   - [x] 问题背景 → 三能力设计与验证 → 架构图 → 已知限制
   - [x] 同步 agent.md
 
-- [ ] Task 8: Docker Compose 部署（app + postgres）
-  - [ ] Dockerfile 应用容器化，compose 一键启动
-  - [ ] 部署验收：接口可访问、数据可导入
+- [x] Task 8: Docker Compose 部署（app + postgres）
+  - [x] Dockerfile 应用容器化，compose 一键启动
+  - [x] 部署验收：接口可访问、数据可导入
 
 - [ ] Task 9: 演示素材与面试话术
   - [ ] 截图/录屏（版本过滤、权威性排序、兜底三个演示）
