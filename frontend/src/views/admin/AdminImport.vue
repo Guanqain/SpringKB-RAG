@@ -76,7 +76,7 @@ async function submit() {
   try {
     const result = await importDocument(form)
     if (result.skipped) {
-      ElMessage.warning(`文档已存在（幂等跳过）：${result.docId}`)
+      ElMessage.info(`文档已存在（幂等跳过）：${result.docId}`)
     } else {
       ElMessage.success(`导入成功：${result.docId}（${result.imported ? '新增' : '已存在'}）`)
     }
@@ -94,7 +94,7 @@ function resetForm() {
 </script>
 
 <template>
-  <div class="page-enter">
+  <div>
     <div class="page-head">
       <h2 class="page-head__title">数据导入</h2>
       <p class="page-head__sub">导入官方文档与知识片段</p>
@@ -167,13 +167,14 @@ function resetForm() {
             </el-form-item>
           </template>
 
-          <el-form-item>
+          <div class="form-actions">
             <el-button type="primary" :loading="submitting" @click="submit">
               提交导入
             </el-button>
             <el-button @click="resetForm">重置</el-button>
             <el-button @click="router.push('/admin/documents')">返回列表</el-button>
-          </el-form-item>
+            <span class="form-actions__note">导入成功后自动跳转文档管理列表</span>
+          </div>
         </el-form>
       </div>
     </div>
@@ -183,7 +184,6 @@ function resetForm() {
 <style scoped>
 .import-wrap {
   display: flex;
-  justify-content: center;
 }
 
 .import-card {
@@ -193,10 +193,36 @@ function resetForm() {
 
 .section-title {
   font-size: var(--fs-sm);
-  font-weight: 700;
-  color: var(--brand-600);
-  margin: 4px 0 14px;
-  padding-bottom: 8px;
-  border-bottom: 1px dashed var(--ink-200);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ink-900);
+  margin: var(--sp-2) 0 var(--sp-4);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.form-actions__note {
+  margin-left: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--ink-500);
+}
+
+/* 输入类控件 focus：1px 陶土内描边（与 theme.css 一致，就近声明避免被局部样式覆盖） */
+.import-card :deep(.el-input__wrapper.is-focus),
+.import-card :deep(.el-textarea__inner:focus) {
+  box-shadow: var(--ring);
+}
+
+/* 分组单选按钮：选中即深墨实底，无彩色强调块 */
+.import-card :deep(.el-radio-button__inner) {
+  border-color: var(--hairline);
+  box-shadow: none;
 }
 </style>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
@@ -7,6 +7,9 @@ import { useAuthStore } from '@/stores/auth'
 const auth = useAuthStore()
 const router = useRouter()
 const open = ref(false)
+
+/** 后端 role 为大写枚举（ADMIN/MEMBER），这里统一归一化后判断 */
+const isAdmin = computed(() => auth.user?.role?.toUpperCase() === 'ADMIN')
 
 const menuItems = [
   { label: '个人中心', to: '/me' },
@@ -33,7 +36,7 @@ function onLogout() {
 
 <template>
   <div v-if="!auth.isAuthenticated" class="login-entry">
-    <button class="btn btn--ghost" @click="onLogin">登录</button>
+    <button class="btn btn--outline" @click="onLogin">登录</button>
   </div>
 
   <div
@@ -67,7 +70,7 @@ function onLogout() {
       <div class="user-menu__header">
         <div class="user-menu__name">
           {{ auth.user?.username ?? '已登录' }}
-          <span v-if="auth.user?.role === 'admin'" class="badge--admin">admin</span>
+          <span v-if="isAdmin" class="badge--admin">管理员</span>
         </div>
         <div class="user-menu__ws">SpringKB 团队</div>
       </div>
@@ -109,17 +112,20 @@ function onLogout() {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: var(--ink-100);
-  border: 1px solid var(--ink-200);
-  color: var(--ink-500);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  color: var(--ink-600);
   cursor: pointer;
-  transition: all 0.18s var(--ease-out);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
 }
 
 .user-menu__avatar:hover {
-  background: var(--brand-50);
-  color: var(--brand-600);
-  border-color: var(--brand-300);
+  background: var(--ink-100);
+  color: var(--ink-900);
+  border-color: var(--hairline-strong);
 }
 
 .user-menu__dropdown {
@@ -127,15 +133,18 @@ function onLogout() {
   top: calc(100% + 10px);
   right: 0;
   width: 220px;
-  background: #fff;
-  border: 1px solid var(--ink-200);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
   border-radius: var(--r-lg);
-  box-shadow: var(--shadow-xl);
+  box-shadow: var(--shadow-overlay-sm);
   padding: var(--sp-2);
   opacity: 0;
   visibility: hidden;
   transform: translateY(-6px);
-  transition: all 0.18s var(--ease-out);
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out),
+    visibility var(--dur-fast) var(--ease-out);
   z-index: 60;
 }
 
@@ -147,7 +156,7 @@ function onLogout() {
 
 .user-menu__header {
   padding: var(--sp-2) var(--sp-3) var(--sp-3);
-  border-bottom: 1px solid var(--ink-100);
+  border-bottom: 1px solid var(--hairline);
   margin-bottom: var(--sp-2);
 }
 
@@ -156,13 +165,18 @@ function onLogout() {
   align-items: center;
   gap: var(--sp-1);
   font-size: var(--fs-sm);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink-900);
+}
+
+.user-menu__name .badge--admin {
+  background: var(--brand-50);
+  color: var(--brand-700);
 }
 
 .user-menu__ws {
   font-size: var(--fs-xs);
-  color: var(--brand-600);
+  color: var(--ink-500);
   font-weight: 500;
   margin-top: 2px;
 }
@@ -176,18 +190,20 @@ function onLogout() {
   font-size: var(--fs-sm);
   color: var(--ink-700);
   cursor: pointer;
-  transition: all 0.15s var(--ease-out);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
 }
 
 .user-menu__item:hover {
-  background: var(--brand-50);
-  color: var(--brand-700);
+  background: var(--surface-sunken);
+  color: var(--ink-900);
 }
 
 .user-menu__tag {
   margin-left: auto;
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   padding: 2px 6px;
   border-radius: 4px;
   background: var(--ink-100);
@@ -196,13 +212,13 @@ function onLogout() {
 }
 
 .user-menu__tag--admin {
-  background: var(--brand-100);
+  background: var(--brand-50);
   color: var(--brand-700);
 }
 
 .user-menu__divider {
   height: 1px;
-  background: var(--ink-100);
+  background: var(--hairline);
   margin: var(--sp-2) 0;
 }
 </style>

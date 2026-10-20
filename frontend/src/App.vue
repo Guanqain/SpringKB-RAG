@@ -9,10 +9,8 @@ const route = useRoute()
 /** 独立页（登录/Setup 等）：仅渲染 router-view，不套导航/页脚 */
 const standalone = computed(() => Boolean(route.meta.standalone))
 
-/** 管理端：路由组件即 AdminLayout（内含深色侧边栏 + 子 router-view），不渲染站点 Footer */
-const isAdmin = computed(
-  () => route.path === '/admin' || route.path.startsWith('/admin/'),
-)
+/** 站点 Footer 只出现在首页：功能页与管理端不渲染，避免过重的页面底部介绍 */
+const showFooter = computed(() => route.name === 'home')
 </script>
 
 <template>
@@ -27,7 +25,7 @@ const isAdmin = computed(
         </transition>
       </router-view>
     </div>
-    <AppFooter v-if="!isAdmin" />
+    <AppFooter v-if="showFooter" />
   </template>
 </template>
 
@@ -37,18 +35,15 @@ const isAdmin = computed(
   display: flex;
   flex-direction: column;
   min-width: 0;
+  background: var(--page-bg);
 }
 
 .page-fade-enter-active,
 .page-fade-leave-active {
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  transition: opacity var(--dur-base) var(--ease-out);
 }
 
-.page-fade-enter-from {
-  opacity: 0;
-  transform: translateY(6px);
-}
-
+.page-fade-enter-from,
 .page-fade-leave-to {
   opacity: 0;
 }

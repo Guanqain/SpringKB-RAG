@@ -145,32 +145,16 @@ function switchTab(tab: 'login' | 'register') {
   display: grid;
   place-items: center;
   padding: var(--sp-8) var(--sp-4);
-  background:
-    radial-gradient(ellipse 55% 40% at 18% 8%, rgba(251, 146, 60, 0.14) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 45% at 85% 15%, rgba(249, 115, 22, 0.12) 0%, transparent 60%),
-    var(--page-bg);
+  background: var(--page-bg);
 }
 
 .login-card {
   width: 400px;
   max-width: 100%;
-  background: #fff;
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-2xl);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-xl);
   padding: var(--sp-10);
-  box-shadow: var(--shadow-xl);
-  animation: login-in 0.35s var(--ease-out);
-}
-
-@keyframes login-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
 }
 
 .login-brand {
@@ -185,22 +169,21 @@ function switchTab(tab: 'login' | 'register') {
   width: 52px;
   height: 52px;
   border-radius: var(--r-lg);
-  background: var(--grad-brand);
+  background: var(--ink-900);
   display: grid;
   place-items: center;
-  box-shadow: var(--shadow-md);
   margin-bottom: var(--sp-4);
 }
 
 .login-brand h1 {
   font-size: var(--fs-3xl);
-  font-weight: 800;
+  font-weight: 600;
   color: var(--ink-900);
   margin: 0;
 }
 
 .login-brand h1 span {
-  color: var(--brand-500);
+  color: var(--brand-600);
 }
 
 .login-brand p {
@@ -214,7 +197,7 @@ function switchTab(tab: 'login' | 'register') {
 }
 
 .login-tabs :deep(.el-tabs__nav-wrap)::after {
-  background: var(--ink-100);
+  background: var(--hairline);
 }
 
 .login-tabs :deep(.el-tabs__nav) {
@@ -235,18 +218,26 @@ function switchTab(tab: 'login' | 'register') {
 }
 
 .login-tabs :deep(.el-tabs__active-bar) {
-  height: 3px;
-  border-radius: 3px;
-  background: var(--grad-brand);
+  height: 2px;
+  border-radius: 2px;
+  background: var(--brand-600);
 }
 
 .login-card :deep(.el-input__wrapper) {
   border-radius: var(--r-md);
-  box-shadow: 0 0 0 1px var(--ink-200) inset;
+  box-shadow: 0 0 0 1px var(--hairline) inset;
 }
 
 .login-card :deep(.el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 1px var(--brand-400) inset, 0 0 0 3px rgba(249, 115, 22, 0.12);
+  box-shadow: var(--ring);
+}
+
+.login-card :deep(.el-input__inner) {
+  color: var(--ink-900);
+}
+
+.login-card :deep(.el-input__inner::placeholder) {
+  color: var(--ink-400);
 }
 
 .el-button.login-btn {
@@ -254,17 +245,15 @@ function switchTab(tab: 'login' | 'register') {
   height: 44px;
   margin-top: var(--sp-2);
   border: none;
-  background: var(--grad-brand);
+  background: var(--ink-900);
   font-weight: 600;
   letter-spacing: 2px;
-  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.25);
+  transition: background-color var(--dur-fast) var(--ease-out);
 }
 
 .el-button.login-btn:hover,
 .el-button.login-btn:focus {
-  background: var(--grad-brand);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.35);
+  background: var(--ink-800);
 }
 
 .login-footnote {

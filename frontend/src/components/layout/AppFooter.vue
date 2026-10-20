@@ -36,7 +36,7 @@ const columns = [
 
       <div class="footer__bottom">
         <span>© 2026 SpringKB. 基于 Spring Boot + Spring AI + pgvector 构建</span>
-        <span>v2.0</span>
+        <span>v2.1</span>
       </div>
     </div>
   </footer>
@@ -68,21 +68,21 @@ const columns = [
   width: 28px;
   height: 28px;
   border-radius: var(--r-md);
-  background: var(--grad-brand);
+  background: rgba(255, 255, 255, 0.1);
   display: grid;
   place-items: center;
 }
 
 .footer__brand-name {
   color: #fff;
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--fs-xl);
 }
 
 .footer__brand-desc {
   font-size: var(--fs-sm);
   line-height: 1.7;
-  color: var(--ink-400);
+  color: rgba(255, 255, 255, 0.62);
   margin-top: var(--sp-3);
   max-width: 320px;
 }
@@ -102,23 +102,23 @@ const columns = [
 
 .footer__link {
   font-size: var(--fs-sm);
-  color: var(--ink-400);
+  color: rgba(255, 255, 255, 0.62);
   padding: var(--sp-2) 0;
-  transition: color 0.15s var(--ease-out);
+  transition: color var(--dur-fast) var(--ease-out);
 }
 
 .footer__link:hover {
-  color: var(--brand-300);
+  color: #fff;
 }
 
 .footer__bottom {
-  border-top: 1px solid var(--ink-700);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
   padding-top: var(--sp-6);
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: var(--fs-sm);
-  color: var(--ink-500);
+  color: rgba(255, 255, 255, 0.62);
 }
 
 @media (max-width: 1024px) {

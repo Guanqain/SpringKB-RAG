@@ -13,73 +13,78 @@ const emit = defineEmits<{
 
 <template>
   <div v-if="entries.length" class="hist">
-    <div class="label">本会话提问（{{ entries.length }}）</div>
-    <div class="chips">
+    <div class="hist__label">本会话提问（{{ entries.length }}）</div>
+    <div class="hist__list">
       <button
         v-for="(e, i) in entries"
         :key="e.id"
         type="button"
-        class="chip"
+        class="item"
         :class="{ cur: e.id === activeId }"
         :title="e.question"
         @click="emit('select', e.id)"
       >
-        <span class="no">{{ entries.length - i }}</span>
-        {{ e.question }}
+        <span class="no num">{{ i + 1 }}</span>
+        <span class="hist__q">{{ e.question }}</span>
       </button>
     </div>
   </div>
 </template>
 
 <style scoped>
+/* 次级列表：hairline 分隔，无卡片阴影、无彩色底 */
 .hist {
-  margin-top: 4px;
+  margin-bottom: var(--sp-2);
 }
 
-.label {
-  font-size: 12px;
-  color: var(--ink-500);
-  margin-bottom: 8px;
+.hist__label {
+  font-size: var(--fs-xs);
+  color: var(--ink-400);
+  margin-bottom: var(--sp-2);
 }
 
-.chips {
+.hist__list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
 }
 
-.chip {
-  max-width: 260px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  border: 1px solid var(--ink-200);
-  background: #fff;
+.item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-2);
+  width: 100%;
+  text-align: left;
+  padding: 7px var(--sp-3);
+  border-left: 2px solid transparent;
   color: var(--ink-600);
-  border-radius: 999px;
-  padding: 5px 12px;
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
 }
 
-.chip:hover {
-  border-color: var(--brand-400);
-  color: var(--brand-700);
-  background: var(--brand-50);
+.item + .item {
+  border-top: 1px solid var(--hairline);
 }
 
-.chip.cur {
-  border-color: var(--brand-400);
-  background: var(--brand-50);
-  color: var(--brand-700);
+.item:hover {
+  color: var(--ink-900);
+}
+
+.item.cur {
+  border-left-color: var(--brand-600);
+  color: var(--brand-600);
   font-weight: 600;
 }
 
 .no {
-  font-family: ui-monospace, Consolas, monospace;
+  flex-shrink: 0;
+  font-size: var(--fs-xs);
   color: var(--ink-400);
-  margin-right: 4px;
+}
+
+.hist__q {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

@@ -25,6 +25,12 @@ const filterForm = reactive({
   keyword: '',
 })
 
+const hasFilter = computed(() =>
+  Boolean(
+    filterForm.source || filterForm.version || filterForm.active || filterForm.keyword.trim(),
+  ),
+)
+
 function applyFilter() {
   store.filter = {
     source: filterForm.source || undefined,
@@ -94,7 +100,7 @@ async function openChunks(doc: Document) {
 </script>
 
 <template>
-  <div class="page-enter">
+  <div>
     <div class="page-head">
       <h2 class="page-head__title">文档管理</h2>
       <p class="page-head__sub">过滤 · 列表 · active 切换 · 删除 · chunks</p>
@@ -122,19 +128,13 @@ async function openChunks(doc: Document) {
       <el-button type="primary" @click="applyFilter">查询</el-button>
       <el-button @click="resetFilter">重置</el-button>
       <div class="spacer" />
-      <el-button type="primary" plain :icon="Plus" @click="router.push('/admin/import')">
+      <el-button plain :icon="Plus" @click="router.push('/admin/import')">
         导入文档
       </el-button>
     </div>
 
-    <div class="card mt">
-      <el-table
-        v-loading="store.loading"
-        :data="store.documents"
-        stripe
-        style="width: 100%"
-        empty-text="暂无文档，可点击「导入文档」添加知识"
-      >
+    <div class="card table-card">
+      <el-table v-loading="store.loading" :data="store.documents" style="width: 100%">
         <el-table-column prop="title" label="标题" min-width="260" show-overflow-tooltip>
           <template #default="{ row }">
             <span class="doc-title">{{ row.title }}</span>
@@ -142,33 +142,27 @@ async function openChunks(doc: Document) {
         </el-table-column>
         <el-table-column label="来源" width="110">
           <template #default="{ row }">
-            <el-tag
-              :type="row.source === 'official' ? 'success' : 'info'"
-              effect="light"
-              size="small"
-            >
+            <span class="badge" :class="row.source === 'official' ? 'badge--official' : 'badge--community'">
               {{ row.source === 'official' ? '官方' : '社区' }}
-            </el-tag>
+            </span>
           </template>
         </el-table-column>
-        <el-table-column label="版本" width="100">
+        <el-table-column label="版本" width="110">
           <template #default="{ row }">
-            <el-tag type="warning" effect="light" size="small">
-              {{ row.version }}
-            </el-tag>
+            <span class="badge badge--neutral">{{ row.version }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="90">
+        <el-table-column label="状态" width="110">
           <template #default="{ row }">
-            <el-switch
-              :model-value="row.active"
-              @change="onToggleActive(row)"
-            />
+            <div class="status-cell">
+              <span class="status-dot" :class="{ 'status-dot--signal': !row.active }" aria-hidden="true" />
+              <el-switch :model-value="row.active" @change="onToggleActive(row)" />
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="chunkCount" label="Chunk 数" width="100" align="center">
           <template #default="{ row }">
-            <span class="mono">{{ row.chunkCount }}</span>
+            <span class="num chunk-count">{{ row.chunkCount }}</span>
           </template>
         </el-table-column>
         <el-table-column label="更新时间" width="170">
@@ -186,6 +180,23 @@ async function openChunks(doc: Document) {
             </el-button>
           </template>
         </el-table-column>
+
+        <template #empty>
+          <div class="empty">
+            <template v-if="hasFilter">
+              <p class="empty__title">没有符合条件的文档 —— 换个条件再试试</p>
+              <p class="empty__hint">当前筛选：来源 / 版本 / 状态 / 关键字。</p>
+              <el-button @click="resetFilter">清空筛选</el-button>
+            </template>
+            <template v-else>
+              <p class="empty__title">知识库还是空的 —— 先导入一份文档</p>
+              <p class="empty__hint">导入后会自动切分片段，参与问答检索。</p>
+              <el-button type="primary" :icon="Plus" @click="router.push('/admin/import')">
+                去导入文档
+              </el-button>
+            </template>
+          </div>
+        </template>
       </el-table>
     </div>
 
@@ -193,17 +204,12 @@ async function openChunks(doc: Document) {
       <div v-loading="chunksLoading" class="chunk-list">
         <div v-for="(c, i) in chunks" :key="c.id" class="chunk-item">
           <div class="chunk-head">
-            <span class="chunk-id mono">#{{ i + 1 }} · {{ c.id }}</span>
+            <span class="chunk-id num">#{{ i + 1 }} · {{ c.id }}</span>
             <span v-if="c.metadata.section" class="chunk-meta">{{ c.metadata.section }}</span>
           </div>
           <p class="chunk-content">{{ c.content }}</p>
           <div class="chunk-meta-row">
-            <el-tag
-              v-if="c.metadata.source"
-              :type="c.metadata.source === 'official' ? 'success' : 'info'"
-              size="small"
-              effect="plain"
-            >
+            <el-tag v-if="c.metadata.source" size="small" effect="plain">
               {{ c.metadata.source }}
             </el-tag>
             <el-tag v-if="c.metadata.version" size="small" effect="plain">
@@ -214,7 +220,11 @@ async function openChunks(doc: Document) {
             </el-tag>
           </div>
         </div>
-        <el-empty v-if="!chunksLoading && chunks.length === 0" description="该文档暂无 chunk" />
+        <div v-if="!chunksLoading && chunks.length === 0" class="empty">
+          <p class="empty__title">这份文档还没有可用片段</p>
+          <p class="empty__hint">导入时提供了正文，才会自动切分成可检索的片段。</p>
+          <el-button @click="drawerVisible = false">关闭</el-button>
+        </div>
       </div>
     </el-drawer>
   </div>
@@ -232,8 +242,8 @@ async function openChunks(doc: Document) {
   flex: 1;
 }
 
-.mt {
-  margin-top: 16px;
+.table-card {
+  margin-top: var(--sp-4);
 }
 
 .w-140 {
@@ -248,9 +258,63 @@ async function openChunks(doc: Document) {
   width: 200px;
 }
 
+/* 表格：无竖线、无斑马纹、仅 1px 底部横向分隔线 */
+.table-card :deep(.el-table) {
+  --el-table-border-color: var(--hairline);
+  --el-table-header-bg-color: var(--surface-sunken);
+  --el-table-row-hover-bg-color: #f5f5f4;
+  background: var(--surface);
+}
+
+.table-card :deep(.el-table th.el-table__cell) {
+  background: var(--surface-sunken);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-600);
+}
+
+.table-card :deep(.el-table td.el-table__cell),
+.table-card :deep(.el-table th.el-table__cell) {
+  border-right: none;
+}
+
+.table-card :deep(.el-table-fixed-column--right::before),
+.table-card :deep(.el-table__fixed-right::before) {
+  box-shadow: none;
+}
+
 .doc-title {
   font-weight: 500;
   font-size: 13.5px;
+  color: var(--ink-900);
+}
+
+.badge--neutral {
+  background: var(--ink-100);
+  color: var(--ink-600);
+}
+
+.status-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* 信号：停用 = 不参与召回，只用陶土小圆点，不做彩色底块 */
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-300);
+  flex: none;
+}
+
+.status-dot--signal {
+  background: var(--brand-600);
+}
+
+.chunk-count {
+  color: var(--ink-700);
 }
 
 .time-cell {
@@ -258,24 +322,68 @@ async function openChunks(doc: Document) {
   color: var(--ink-500);
 }
 
+.empty {
+  padding: var(--sp-12) var(--sp-6);
+  text-align: center;
+}
+
+.empty__title {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  color: var(--ink-900);
+}
+
+.empty__hint {
+  margin: var(--sp-2) 0 var(--sp-5);
+  font-size: var(--fs-sm);
+  color: var(--ink-500);
+}
+
+/* 分页器：克制 —— 无按钮边框、当前页墨色实底、其余文字按钮 */
+.table-card :deep(.el-pagination) {
+  justify-content: flex-end;
+  margin-top: var(--sp-4);
+}
+
+.table-card :deep(.el-pagination button),
+.table-card :deep(.el-pagination .el-pager li) {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  font-weight: 400;
+}
+
+.table-card :deep(.el-pagination .el-pager li.is-active) {
+  background: var(--ink-900);
+  color: #fff;
+  border-radius: var(--r-sm);
+  font-weight: 600;
+}
+
+/* 抽屉内：hairline-strong 分隔，去掉彩色底块 */
 .chunk-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
 
 .chunk-item {
-  border: 1px solid var(--ink-200);
-  border-radius: 8px;
-  padding: 12px 14px;
-  background: var(--brand-50);
+  padding: var(--sp-4) 0;
+  border-bottom: 1px solid var(--hairline-strong);
+}
+
+.chunk-item:first-child {
+  padding-top: 0;
+}
+
+.chunk-item:last-child {
+  border-bottom: none;
 }
 
 .chunk-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: var(--sp-2);
 }
 
 .chunk-id {
@@ -285,14 +393,14 @@ async function openChunks(doc: Document) {
 
 .chunk-meta {
   font-size: 12px;
-  color: var(--brand-600);
+  color: var(--ink-500);
 }
 
 .chunk-content {
-  margin: 0 0 8px;
+  margin: 0 0 var(--sp-2);
   font-size: 13px;
-  line-height: 1.65;
-  color: var(--ink-800);
+  line-height: 1.7;
+  color: var(--ink-700);
   max-height: 120px;
   overflow-y: auto;
 }

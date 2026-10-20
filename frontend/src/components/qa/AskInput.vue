@@ -63,7 +63,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 </script>
 
 <template>
-  <div ref="root" class="ask glass">
+  <div ref="root" class="ask">
     <textarea
       ref="ta"
       v-model="question"
@@ -77,7 +77,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
     <div class="row">
       <div class="vselect">
         <button type="button" class="pill" :class="{ on: versionOpen }" @click.stop="versionOpen = !versionOpen">
-          版本：{{ version || '全部' }} ▾
+          {{ version || '全部版本' }} <span class="caret">▾</span>
         </button>
         <transition name="drop">
           <div v-if="versionOpen" class="vmenu">
@@ -95,18 +95,27 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
           </div>
         </transition>
       </div>
-      <span class="hint">答案附真实引用 · 未收录会明确告知</span>
-      <button type="button" class="btn" :disabled="loading || !question.trim()" @click="doSubmit">
-        <span v-if="loading" class="spinner" />
-        {{ loading ? '检索中…' : '提问 →' }}
+      <button type="button" class="send" :disabled="loading || !question.trim()" @click="doSubmit">
+        {{ loading ? '检索中…' : '提问' }}
       </button>
     </div>
   </div>
 </template>
 
 <style scoped>
+/* 输入条：白面 + hairline，focus 出现 1px 陶土 ring（--ring） */
 .ask {
-  padding: var(--sp-4);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3) var(--sp-4);
+  transition:
+    box-shadow var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.ask:focus-within {
+  box-shadow: var(--ring);
 }
 
 .ta {
@@ -116,8 +125,9 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   border-radius: var(--r-md);
   background: transparent;
   color: var(--ink-800);
-  padding: 4px 2px;
-  font: var(--fs-lg) / 1.6 inherit;
+  padding: 2px 0;
+  font-size: var(--fs-lg);
+  line-height: 1.7;
   font-family: inherit;
   outline: none;
 }
@@ -133,10 +143,10 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 .row {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
-  margin-top: var(--sp-3);
-  padding-top: var(--sp-3);
-  border-top: 1px solid var(--ink-100);
+  gap: var(--sp-3);
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--hairline);
   flex-wrap: wrap;
 }
 
@@ -144,37 +154,44 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   position: relative;
 }
 
+/* 版本下拉：次要控件（文字 + 小箭头，无边框感） */
 .pill {
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-md);
-  padding: 4px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  padding: 2px 2px;
   font-size: var(--fs-sm);
-  color: var(--ink-600);
-  background: #fff;
+  color: var(--ink-500);
   cursor: pointer;
   font-family: inherit;
-  transition: border-color 0.12s ease, color 0.12s ease;
+  transition: color var(--dur-fast) var(--ease-out);
 }
 
-.pill.on,
-.pill:hover {
-  border-color: var(--brand-400);
-  color: var(--brand-700);
+.pill:hover,
+.pill.on {
+  color: var(--ink-900);
+}
+
+.caret {
+  font-size: 10px;
+  line-height: 1;
 }
 
 .vmenu {
   position: absolute;
   z-index: 20;
-  top: calc(100% + 6px);
+  bottom: calc(100% + 6px);
   left: 0;
   min-width: 140px;
   max-height: 220px;
   overflow: auto;
   border-radius: var(--r-md);
-  border: 1px solid var(--ink-200);
-  background: #fff;
+  border: 1px solid var(--hairline);
+  background: var(--surface);
   padding: 4px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-overlay-sm);
 }
 
 .opt {
@@ -184,7 +201,7 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   border: none;
   background: transparent;
   color: var(--ink-700);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-family: inherit;
   padding: 7px 10px;
   border-radius: var(--r-sm);
@@ -192,17 +209,19 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 }
 
 .opt:hover {
-  background: var(--brand-50);
+  background: var(--surface-sunken);
 }
 
 .opt.cur {
-  color: var(--brand-700);
+  color: var(--brand-600);
   font-weight: 600;
 }
 
 .drop-enter-active,
 .drop-leave-active {
-  transition: opacity 0.12s ease, transform 0.12s ease;
+  transition:
+    opacity var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
 }
 
 .drop-enter-from,
@@ -211,50 +230,31 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
   transform: translateY(-4px);
 }
 
-.hint {
-  font-size: var(--fs-sm);
-  color: var(--ink-400);
-}
-
-.btn {
+/* 发送：深墨实底（--ink-900），hover --ink-800 */
+.send {
   margin-left: auto;
   border: none;
   border-radius: var(--r-md);
   padding: 8px 18px;
   font-size: var(--fs-sm);
-  font-weight: 700;
+  font-weight: 600;
   color: #fff;
   font-family: inherit;
-  background: var(--grad-brand);
+  background: var(--ink-900);
   cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: box-shadow 0.12s ease, transform 0.12s ease;
+  transition: background-color var(--dur-fast) var(--ease-out);
 }
 
-.btn:hover:not(:disabled) {
-  box-shadow: 0 4px 18px rgba(249, 115, 22, 0.45);
-  transform: translateY(-1px);
+.send:hover:not(:disabled) {
+  background: var(--ink-800);
 }
 
-.btn:disabled {
-  opacity: 0.55;
+.send:active:not(:disabled) {
+  background: var(--ink-700);
+}
+
+.send:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
-}
-
-.spinner {
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 </style>

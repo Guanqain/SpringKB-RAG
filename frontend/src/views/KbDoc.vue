@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-// 文档详情（外壳）：面包屑 + 详情头 + Markdown 正文容器 + 相关推荐。
-// 数据依赖未就绪后端（GET /api/kb/doc/:id，见 spec §待确认 C6/C7），
-// 正文/推荐/元信息一律空态；:id 仅用于展示与面包屑，不请求、不伪造数据。
+// 文档详情（外壳）：面包屑 + 详情头 + Markdown 正文区 + 原文外链 + 相关推荐。
+// 数据依赖未就绪后端（GET /api/kb/doc/:id，见 spec §待确认 C4/C6/C7），
+// 正文/元信息/推荐一律空态；:id 仅用于展示与面包屑，不请求、不伪造数据。
 const route = useRoute()
 const docId = computed(() => String(route.params.id ?? ''))
 </script>
@@ -13,90 +13,46 @@ const docId = computed(() => String(route.params.id ?? ''))
     <div class="crumb">
       <router-link to="/kb">知识库</router-link>
       <span>/</span>
-      <span>文档详情 #{{ docId }}</span>
+      <span>文档详情 #<span class="num">{{ docId }}</span></span>
     </div>
 
-    <!-- 详情头：标题 / 元信息 / 操作位 -->
-    <div class="doc-hero">
+    <!-- 详情头：标题 / 元信息 / 操作位（徽标与元信息依赖 C7，暂不伪造） -->
+    <header class="doc-hero">
       <div class="doc-hero__main">
         <h2 class="doc-hero__title">文档详情</h2>
-        <div class="doc-hero__meta">
-          <span class="badge badge--placeholder">版本 · 待补充</span>
-          <span class="badge badge--placeholder">来源 · 待补充</span>
-          <span class="badge badge--placeholder">已验证 · 待补充</span>
-          <span class="doc-hero__id">文档 ID：{{ docId }}</span>
-        </div>
+        <p class="doc-hero__meta">
+          文档 ID：<span class="num">{{ docId }}</span>
+        </p>
       </div>
       <div class="doc-hero__actions">
-        <router-link class="btn btn--primary" to="/qa">
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-          基于本文提问
-        </router-link>
-        <button class="btn btn--outline" type="button" disabled title="待后端就绪">
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M7 10v12" />
-            <path
-              d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"
-            />
-          </svg>
+        <router-link class="btn btn--primary" to="/qa">+ 基于本文提问</router-link>
+        <button class="btn btn--outline" type="button" disabled title="点赞能力还没接上">
           点赞
         </button>
-        <button class="btn btn--outline" type="button" disabled title="待后端就绪">
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-          </svg>
+        <button class="btn btn--outline" type="button" disabled title="收藏能力还没接上">
           收藏
         </button>
       </div>
-    </div>
+    </header>
 
-    <!-- 正文区：Markdown 渲染容器（内容待后端就绪，当前空态） -->
-    <div class="doc-body">
-      <div class="md-body empty">
-        <p class="empty__title">文档正文</p>
-        <p class="empty__hint">Markdown 内容 · 待后端 /api/kb/doc 就绪</p>
-      </div>
-    </div>
+    <!-- 正文区：无卡片外壳，直接排在纸面上（Markdown 渲染依赖 C6/C7） -->
+    <article class="doc-body">
+      <p class="empty__text">这篇文档暂时打不开 —— 它可能还没被导入，或者已经下线</p>
+      <router-link class="btn btn--primary" to="/kb">回到知识库</router-link>
+    </article>
 
-    <!-- 相关推荐 -->
-    <div class="rec">
-      <div class="rec__label">相关推荐</div>
-      <div class="rec-grid">
-        <div class="card empty rec-grid__empty">
-          <p class="empty__title">暂无相关推荐</p>
-          <p class="empty__hint">相似文档 · 待后端就绪</p>
-        </div>
-      </div>
-    </div>
+    <!-- 原文外链：SourceRef 无 originalUrl（契约 §8 / C6），未就绪 → 禁用态 + 提示，不伪造 URL -->
+    <p class="doc-origin">
+      <span class="doc-origin__link" role="link" aria-disabled="true" title="原文链接待后端就绪">
+        打开原文
+      </span>
+    </p>
+
+    <!-- 相关推荐位（数据依赖 C4/C7） -->
+    <section class="rec">
+      <h3 class="rec__label">相关推荐</h3>
+      <p class="rec__note">等这篇文档能被打开，这里会列出与它相关的文档。</p>
+    </section>
   </section>
 </template>
 
@@ -113,7 +69,8 @@ const docId = computed(() => String(route.params.id ?? ''))
   justify-content: space-between;
   align-items: flex-start;
   gap: var(--sp-6);
-  margin-bottom: var(--sp-6);
+  padding-bottom: var(--sp-6);
+  border-bottom: 1px solid var(--hairline);
 }
 
 .doc-hero__main {
@@ -122,29 +79,13 @@ const docId = computed(() => String(route.params.id ?? ''))
 
 .doc-hero__title {
   font-size: var(--fs-4xl);
-  font-weight: 800;
   color: var(--ink-900);
 }
 
 .doc-hero__meta {
-  display: flex;
-  gap: var(--sp-3);
-  align-items: center;
-  flex-wrap: wrap;
+  margin-top: var(--sp-2);
   font-size: var(--fs-sm);
   color: var(--ink-500);
-  margin-top: var(--sp-3);
-}
-
-.doc-hero__id {
-  color: var(--ink-400);
-}
-
-.badge--placeholder {
-  background: transparent;
-  border: 1px dashed var(--ink-300);
-  color: var(--ink-400);
-  font-weight: 500;
 }
 
 .doc-hero__actions {
@@ -158,69 +99,63 @@ const docId = computed(() => String(route.params.id ?? ''))
   cursor: not-allowed;
 }
 
+/* 正文区：纸面直排，不使用卡片外壳 */
 .doc-body {
-  background: #fff;
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-xl);
-  padding: var(--sp-8);
-  line-height: 1.85;
-  color: var(--ink-700);
-  margin-bottom: var(--sp-6);
-}
-
-.md-body {
-  min-height: 180px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: var(--sp-4);
+  min-height: 260px;
+  padding: var(--sp-12) 0;
+  text-align: center;
+  font-size: var(--fs-lg);
+  line-height: 1.7;
+  color: var(--ink-700);
+}
+
+.empty__text {
+  font-weight: 600;
+  color: var(--ink-700);
+  line-height: 1.7;
+  max-width: 460px;
+}
+
+.doc-origin {
+  margin-top: var(--sp-4);
+}
+
+.doc-origin__link {
+  display: inline-block;
+  font-size: var(--fs-md);
+  color: var(--brand-600);
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rec {
+  margin-top: var(--sp-10);
+  padding-top: var(--sp-6);
+  border-top: 1px solid var(--hairline);
 }
 
 .rec__label {
   font-size: var(--fs-sm);
   font-weight: 600;
-  color: var(--ink-500);
-  margin-bottom: var(--sp-3);
-  text-transform: uppercase;
+  color: var(--ink-600);
   letter-spacing: 0.05em;
 }
 
-.rec-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--sp-3);
-}
-
-.rec-grid__empty {
-  grid-column: 1 / -1;
-}
-
-.empty {
-  text-align: center;
-  padding: var(--sp-10);
-  border: 1px dashed var(--ink-200);
-  box-shadow: none;
-}
-
-.empty__title {
-  font-size: var(--fs-lg);
-  font-weight: 700;
-  color: var(--ink-800);
-}
-
-.empty__hint {
+.rec__note {
   margin-top: var(--sp-2);
-  font-size: var(--fs-md);
-  color: var(--ink-500);
+  font-size: var(--fs-sm);
+  color: var(--ink-400);
+  line-height: 1.7;
 }
 
 @media (max-width: 900px) {
   .doc-hero {
     flex-direction: column;
-  }
-
-  .rec-grid {
-    grid-template-columns: 1fr;
   }
 }
 </style>

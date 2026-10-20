@@ -9,63 +9,68 @@ const props = defineProps<{
 }>()
 
 const toneClass = computed(() => `stat-card--${props.tone ?? 'primary'}`)
+// 信号表达：仅「异常 / 待办」类信号（danger）落在陶土小圆点与数字上，不做彩色底块
+const hasSignal = computed(() => props.tone === 'danger')
 </script>
 
 <template>
   <div class="stat-card" :class="toneClass">
-    <span class="stat-label">{{ label }}</span>
-    <span class="stat-value mono">{{ value.toLocaleString() }}</span>
+    <span class="stat-label">
+      <span v-if="hasSignal" class="stat-dot" aria-hidden="true" />
+      {{ label }}
+    </span>
+    <span class="stat-value num">{{ value.toLocaleString() }}</span>
     <span v-if="hint" class="stat-hint">{{ hint }}</span>
   </div>
 </template>
 
 <style scoped>
 .stat-card {
-  background: #fff;
-  border: 1px solid var(--ink-200);
-  border-radius: 10px;
-  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  padding: var(--sp-5);
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  gap: var(--sp-1);
+  transition: border-color var(--dur-fast) var(--ease-out);
 }
 
 .stat-card:hover {
-  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.1);
-  transform: translateY(-2px);
+  border-color: var(--hairline-strong);
 }
 
 .stat-label {
-  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
   color: var(--ink-500);
 }
 
+.stat-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brand-600);
+  flex: none;
+}
+
 .stat-value {
-  font-size: 30px;
-  font-weight: 700;
-  line-height: 1.1;
-  color: var(--ink-800);
-}
-
-.stat-card--primary .stat-value {
-  color: var(--brand-500);
-}
-
-.stat-card--success .stat-value {
-  color: #059669;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-4xl);
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--ink-900);
 }
 
 .stat-card--danger .stat-value {
-  color: var(--danger);
-}
-
-.stat-card--muted .stat-value {
-  color: var(--ink-800);
+  color: var(--brand-600);
 }
 
 .stat-hint {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--ink-500);
 }
 </style>

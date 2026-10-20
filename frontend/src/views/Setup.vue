@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import NavBar from '@/components/layout/NavBar.vue'
-import AppFooter from '@/components/layout/AppFooter.vue'
-// 首次启动向导（外壳）：独立布局（meta.standalone），自行套用 NavBar + Footer；
-// 三步流程与团队表单为骨架，提交通道禁用，待后端就绪。
+// 首次启动向导（外壳）：独立布局（meta.standalone），仅套用 NavBar，不渲染 Footer（Footer 只在首页）；
+// 三步流程与团队表单为骨架，提交通道禁用（C1：无 /api/setup/*），不做任何请求或提交。
 const steps = ['团队信息', '知识库配置', '完成']
 const activeStep = ref(0)
 </script>
@@ -18,7 +17,7 @@ const activeStep = ref(0)
         <div class="setup__ghost setup__ghost--2"></div>
 
         <div class="setup__card">
-          <div class="setup__logo">
+          <div class="setup__brand">
             <svg width="24" height="24" viewBox="0 0 24 24">
               <path d="M4 4h16v4H4V4zm0 8h10v8H4v-8zm12 0h4v8h-4v-8z" fill="#fff" />
             </svg>
@@ -37,18 +36,27 @@ const activeStep = ref(0)
           </div>
 
           <div class="setup__body">
-            <p class="setup__empty-title">初始化向导</p>
-            <p class="setup__empty-hint">功能开发中 / 待后端就绪，提交通道暂未开放</p>
+            <p class="setup__lead">先给你的团队起个名字 —— 这一步定下来，后面的知识才有个家</p>
+            <div class="setup__form">
+              <label class="setup__field">
+                <span class="setup__field-label">团队名称</span>
+                <input class="setup__input" type="text" placeholder="例如：平台架构组" />
+              </label>
+              <label class="setup__field">
+                <span class="setup__field-label">知识库说明</span>
+                <input class="setup__input" type="text" placeholder="一句话说明这里收录什么" />
+              </label>
+            </div>
           </div>
 
           <div class="setup__actions">
-            <button class="btn btn--primary" type="button" disabled>完成初始化</button>
+            <button class="btn btn--primary" type="button" disabled title="初始化能力还没接上">
+              完成初始化
+            </button>
           </div>
         </div>
       </div>
     </main>
-
-    <AppFooter />
   </div>
 </template>
 
@@ -64,10 +72,7 @@ const activeStep = ref(0)
   display: grid;
   place-items: center;
   padding: var(--sp-12) var(--sp-4);
-  background:
-    radial-gradient(ellipse 55% 40% at 18% 8%, rgba(251, 146, 60, 0.12) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 40% at 85% 15%, rgba(249, 115, 22, 0.1) 0%, transparent 60%),
-    var(--page-bg);
+  background: var(--page-bg);
 }
 
 .setup__stack {
@@ -76,12 +81,13 @@ const activeStep = ref(0)
   max-width: 100%;
 }
 
+/* 居中叠卡：白面 + hairline，无阴影 */
 .setup__ghost {
   position: absolute;
   inset: 0;
-  background: #fff;
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-2xl);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-xl);
   opacity: 0.45;
   transform: scale(0.96) translateY(14px);
   pointer-events: none;
@@ -94,28 +100,26 @@ const activeStep = ref(0)
 
 .setup__card {
   position: relative;
-  background: #fff;
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-2xl);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-xl);
   padding: var(--sp-10);
-  box-shadow: var(--shadow-xl);
 }
 
-.setup__logo {
+.setup__brand {
   width: 52px;
   height: 52px;
   border-radius: var(--r-lg);
-  background: var(--grad-brand);
+  background: var(--ink-900);
   display: grid;
   place-items: center;
   margin: 0 auto var(--sp-4);
-  box-shadow: var(--shadow-md);
 }
 
 .setup__title {
   text-align: center;
   font-size: var(--fs-3xl);
-  font-weight: 800;
+  font-weight: 600;
   color: var(--ink-900);
 }
 
@@ -138,59 +142,89 @@ const activeStep = ref(0)
   gap: var(--sp-2);
 }
 
+/* 步骤点：墨色实心；当前步为陶土点 */
 .setup__step-dot {
   width: 28px;
   height: 28px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: var(--ink-100);
-  color: var(--ink-400);
+  background: var(--ink-900);
+  color: #fff;
   font-size: var(--fs-sm);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .setup__step--active .setup__step-dot {
-  background: var(--grad-brand);
-  color: #fff;
-  box-shadow: var(--glow-brand);
+  background: var(--brand-600);
 }
 
 .setup__step-label {
   font-size: var(--fs-sm);
-  color: var(--ink-400);
-  font-weight: 500;
+  color: var(--ink-500);
 }
 
 .setup__step--active .setup__step-label {
   color: var(--ink-900);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .setup__step-line {
   width: 40px;
-  height: 2px;
-  background: var(--ink-200);
+  height: 1px;
+  background: var(--hairline);
   margin: 0 var(--sp-2);
 }
 
 .setup__body {
   text-align: center;
-  padding: var(--sp-10);
-  border: 1px dashed var(--ink-200);
-  border-radius: var(--r-lg);
 }
 
-.setup__empty-title {
-  font-size: var(--fs-lg);
-  font-weight: 700;
-  color: var(--ink-800);
-}
-
-.setup__empty-hint {
-  margin-top: var(--sp-2);
+.setup__lead {
   font-size: var(--fs-md);
-  color: var(--ink-500);
+  color: var(--ink-600);
+  line-height: 1.7;
+  margin-bottom: var(--sp-6);
+}
+
+/* 团队信息表单外壳（无请求、无提交） */
+.setup__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  text-align: left;
+}
+
+.setup__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.setup__field-label {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-600);
+}
+
+.setup__input {
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-md);
+  color: var(--ink-900);
+  background: var(--surface);
+  outline: none;
+  transition: box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.setup__input::placeholder {
+  color: var(--ink-400);
+}
+
+.setup__input:focus {
+  box-shadow: var(--ring);
+  border-color: transparent;
 }
 
 .setup__actions {
@@ -202,7 +236,5 @@ const activeStep = ref(0)
 .btn[disabled] {
   opacity: 0.55;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
 }
 </style>

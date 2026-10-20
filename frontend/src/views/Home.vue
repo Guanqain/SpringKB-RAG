@@ -52,7 +52,7 @@ const stats = computed<StatItem[]>(() => {
     { value: realValue(() => totalDocs.value), label: '文档总数', hint: aggHint, live: loaded.value },
     { value: realValue(() => totalChunks.value), label: '知识片段', hint: aggHint, live: loaded.value },
     { value: '3', label: '覆盖产品线', hint: 'Spring / Vue 全家桶', live: true },
-    { value: '—', label: '引用命中率', hint: '待统计', live: false },
+    { value: '—', label: '引用命中率', hint: '暂无统计口径', live: false },
   ]
 })
 
@@ -187,7 +187,7 @@ function goQa(text: string) {
                 <path d="m12 5 7 7-7 7" />
               </svg>
             </div>
-            <div class="product__icon product__icon--orange">
+            <div class="product__icon">
               <svg
                 width="28"
                 height="28"
@@ -207,7 +207,7 @@ function goQa(text: string) {
             </p>
             <div class="product__meta">
               <span class="product__meta-item product__meta-item--muted">
-                文档数 · 待 /api/kb/overview 就绪
+                收录情况见知识库
               </span>
             </div>
           </router-link>
@@ -228,7 +228,7 @@ function goQa(text: string) {
                 <path d="m12 5 7 7-7 7" />
               </svg>
             </div>
-            <div class="product__icon product__icon--blue">
+            <div class="product__icon">
               <svg
                 width="28"
                 height="28"
@@ -248,7 +248,7 @@ function goQa(text: string) {
             </p>
             <div class="product__meta">
               <span class="product__meta-item product__meta-item--muted">
-                文档数 · 待 /api/kb/overview 就绪
+                收录情况见知识库
               </span>
             </div>
           </router-link>
@@ -269,7 +269,7 @@ function goQa(text: string) {
                 <path d="m12 5 7 7-7 7" />
               </svg>
             </div>
-            <div class="product__icon product__icon--green">
+            <div class="product__icon">
               <svg
                 width="28"
                 height="28"
@@ -289,7 +289,7 @@ function goQa(text: string) {
             </p>
             <div class="product__meta">
               <span class="product__meta-item product__meta-item--muted">
-                文档数 · 待 /api/kb/overview 就绪
+                收录情况见知识库
               </span>
             </div>
           </router-link>
@@ -463,44 +463,15 @@ function goQa(text: string) {
 </template>
 
 <style scoped>
-/* ========== Hero ========== */
+/* ========== Hero（纸面排版，无光斑 / 无网格背景）========== */
 .hero {
-  position: relative;
   padding: 96px 0 88px;
-  background:
-    radial-gradient(ellipse 55% 40% at 18% 8%, rgba(251, 146, 60, 0.14) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 40% at 85% 15%, rgba(249, 115, 22, 0.12) 0%, transparent 60%),
-    #fdfcfa;
-  overflow: hidden;
-}
-
-.hero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--grad-hero);
-  pointer-events: none;
-}
-
-.hero::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(249, 115, 22, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(249, 115, 22, 0.05) 1px, transparent 1px);
-  background-size: 44px 44px;
-  mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 30%, transparent 75%);
-  pointer-events: none;
 }
 
 .hero__inner {
-  position: relative;
   text-align: center;
-  max-width: 760px;
+  max-width: var(--measure);
   margin: 0 auto;
-  z-index: 1;
 }
 
 .hero__badge {
@@ -509,11 +480,10 @@ function goQa(text: string) {
   gap: var(--sp-2);
   padding: 6px 14px;
   border-radius: 100px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid var(--brand-200);
-  box-shadow: var(--shadow-xs);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
   font-size: var(--fs-sm);
-  color: var(--brand-700);
+  color: var(--ink-500);
   font-weight: 500;
   margin-bottom: var(--sp-6);
 }
@@ -523,56 +493,48 @@ function goQa(text: string) {
   height: 7px;
   border-radius: 50%;
   background: var(--success);
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
 }
 
 .hero__title {
-  font-size: 56px;
-  font-weight: 800;
+  font-size: var(--fs-5xl);
+  font-weight: 600;
   color: var(--ink-900);
-  line-height: 1.12;
-  letter-spacing: -0.03em;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
   margin-bottom: var(--sp-5);
 }
 
 .hero__title em {
   font-style: normal;
-  background: var(--grad-brand);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  position: relative;
+  color: inherit;
 }
 
 .hero__desc {
   font-size: var(--fs-xl);
   color: var(--ink-500);
-  margin-bottom: 40px;
-  line-height: 1.75;
+  margin-bottom: var(--sp-10);
+  line-height: 1.7;
 }
 
 .hero__search {
-  background: #fff;
-  border: 1px solid var(--ink-200);
-  border-radius: 100px;
-  box-shadow: var(--shadow-lg);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
   padding: 8px 8px 8px 24px;
   display: flex;
   align-items: center;
   gap: var(--sp-3);
-  transition: box-shadow 0.25s var(--ease-out), border-color 0.25s, transform 0.25s var(--ease-out);
+  transition: box-shadow var(--dur-fast) var(--ease-out);
   max-width: 660px;
   margin: 0 auto var(--sp-5);
 }
 
 .hero__search:focus-within {
-  border-color: var(--brand-400);
-  box-shadow: var(--glow-brand);
-  transform: translateY(-2px);
+  box-shadow: var(--ring);
 }
 
 .hero__search-icon {
-  color: var(--brand-500);
+  color: var(--ink-400);
   flex-shrink: 0;
 }
 
@@ -583,7 +545,7 @@ function goQa(text: string) {
   outline: none;
   font-size: var(--fs-lg);
   background: transparent;
-  color: var(--ink-800);
+  color: var(--ink-900);
   padding: var(--sp-3) 0;
 }
 
@@ -593,18 +555,16 @@ function goQa(text: string) {
 
 .hero__search-btn {
   padding: 14px 32px;
-  border-radius: 100px;
-  background: var(--grad-brand);
+  border-radius: var(--r-md);
+  background: var(--ink-900);
   color: #fff;
   font-weight: 600;
   font-size: var(--fs-md);
-  box-shadow: 0 4px 14px rgba(249, 115, 22, 0.35);
-  transition: transform 0.18s var(--ease-out), box-shadow 0.18s;
+  transition: background-color var(--dur-fast) var(--ease-out);
 }
 
 .hero__search-btn:hover {
-  transform: translateY(-1px) scale(1.02);
-  box-shadow: 0 8px 20px rgba(249, 115, 22, 0.45);
+  background: var(--ink-800);
 }
 
 .hero__chips {
@@ -620,28 +580,27 @@ function goQa(text: string) {
   gap: var(--sp-1);
   padding: 7px 16px;
   border-radius: 100px;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid var(--ink-200);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
   font-size: var(--fs-sm);
   color: var(--ink-600);
   cursor: pointer;
-  transition: all 0.18s var(--ease-out);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
 }
 
 .chip:hover {
-  border-color: var(--brand-400);
-  color: var(--brand-700);
-  background: var(--brand-50);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
+  border-color: var(--brand-600);
+  color: var(--brand-600);
 }
 
 /* ========== Stats Bar ========== */
 .stats {
   padding: var(--sp-10) 0;
-  background: #fff;
-  border-top: 1px solid var(--ink-100);
-  border-bottom: 1px solid var(--ink-100);
+  background: var(--surface);
+  border-top: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
 }
 
 .stats__grid {
@@ -655,16 +614,15 @@ function goQa(text: string) {
 }
 
 .stat + .stat {
-  border-left: 1px solid var(--ink-100);
+  border-left: 1px solid var(--hairline);
 }
 
 .stat__value {
-  font-size: 40px;
-  font-weight: 800;
-  background: var(--grad-brand);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-4xl);
+  font-weight: 600;
+  color: var(--ink-900);
   letter-spacing: -0.02em;
   line-height: 1.15;
 }
@@ -678,9 +636,9 @@ function goQa(text: string) {
 
 .stat__delta {
   font-size: var(--fs-xs);
-  color: var(--success);
+  color: var(--ink-500);
   margin-top: var(--sp-1);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .stat__delta--muted {
@@ -693,7 +651,7 @@ function goQa(text: string) {
 }
 
 .section--alt {
-  background: #fff;
+  background: var(--page-bg);
 }
 
 .section__header {
@@ -705,7 +663,7 @@ function goQa(text: string) {
 
 .section__title {
   font-size: var(--fs-4xl);
-  font-weight: 800;
+  font-weight: 600;
   color: var(--ink-900);
   letter-spacing: -0.01em;
 }
@@ -723,23 +681,22 @@ function goQa(text: string) {
   font-size: var(--fs-md);
   font-weight: 600;
   color: var(--brand-600);
-  transition: gap 0.15s var(--ease-out);
+  transition: color var(--dur-fast) var(--ease-out);
 }
 
 .section__link:hover {
-  gap: var(--sp-2);
   color: var(--brand-700);
 }
 
 .section__link svg {
-  transition: transform 0.15s var(--ease-out);
+  transition: transform var(--dur-fast) var(--ease-out);
 }
 
 .section__link:hover svg {
   transform: translateX(2px);
 }
 
-/* ========== Product Cards ========== */
+/* ========== Product Cards（白面 + hairline，hover 只变描边与底色）========== */
 .products {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -749,87 +706,36 @@ function goQa(text: string) {
 .product {
   display: block;
   color: inherit;
-  background: #fff;
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-xl);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
   padding: var(--sp-8);
-  transition: all 0.25s var(--ease-out);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
   position: relative;
-  overflow: hidden;
-}
-
-.product::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: var(--grad-brand);
-  opacity: 0;
-  transition: opacity 0.25s var(--ease-out);
-}
-
-.product::after {
-  content: '';
-  position: absolute;
-  top: -40%;
-  right: -25%;
-  width: 220px;
-  height: 220px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(251, 146, 60, 0.12) 0%, transparent 70%);
-  opacity: 0;
-  transition: opacity 0.3s var(--ease-out);
-  pointer-events: none;
 }
 
 .product:hover {
-  transform: translateY(-5px);
-  box-shadow: var(--shadow-xl);
-  border-color: var(--brand-200);
-}
-
-.product:hover::before,
-.product:hover::after {
-  opacity: 1;
+  border-color: var(--ink-300);
+  background: var(--surface-sunken);
 }
 
 .product__icon {
   width: 56px;
   height: 56px;
-  border-radius: var(--r-lg);
+  border-radius: var(--r-md);
   display: grid;
   place-items: center;
   margin-bottom: var(--sp-5);
-  transition: transform 0.25s var(--ease-out);
-}
-
-.product:hover .product__icon {
-  transform: scale(1.08) rotate(-4deg);
-}
-
-.product__icon--orange {
-  background: var(--brand-50);
-  color: var(--brand-600);
-  border: 1px solid var(--brand-100);
-}
-
-.product__icon--blue {
-  background: #eff6ff;
-  color: #2563eb;
-  border: 1px solid #dbeafe;
-}
-
-.product__icon--green {
-  background: #f0fdf4;
-  color: #16a34a;
-  border: 1px solid #dcfce7;
+  background: var(--ink-100);
+  border: 1px solid var(--hairline);
+  color: var(--ink-600);
 }
 
 .product__title {
   font-size: var(--fs-2xl);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink-900);
   margin-bottom: var(--sp-2);
 }
@@ -845,7 +751,7 @@ function goQa(text: string) {
   display: flex;
   gap: var(--sp-4);
   padding-top: var(--sp-5);
-  border-top: 1px dashed var(--ink-200);
+  border-top: 1px solid var(--hairline);
 }
 
 .product__meta-item {
@@ -871,15 +777,17 @@ function goQa(text: string) {
   display: grid;
   place-items: center;
   color: var(--ink-500);
-  transition: all 0.2s var(--ease-out);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
 }
 
 .product:hover .product__cta {
-  background: var(--grad-brand);
+  background: var(--ink-900);
   color: #fff;
 }
 
-/* ========== Features Grid ========== */
+/* ========== Features Grid（白面 + hairline，hover 只变描边与底色）========== */
 .features {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -890,17 +798,17 @@ function goQa(text: string) {
   display: flex;
   gap: var(--sp-5);
   padding: var(--sp-6);
-  background: #fdfcfa;
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-xl);
-  transition: all 0.22s var(--ease-out);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
 }
 
 .feature:hover {
-  background: #fff;
-  box-shadow: var(--shadow-md);
-  border-color: var(--brand-200);
-  transform: translateY(-2px);
+  border-color: var(--ink-300);
+  background: var(--surface-sunken);
 }
 
 .feature__icon {
@@ -908,16 +816,15 @@ function goQa(text: string) {
   width: 44px;
   height: 44px;
   border-radius: var(--r-md);
-  background: var(--grad-brand);
+  background: var(--ink-100);
   display: grid;
   place-items: center;
-  color: #fff;
-  box-shadow: 0 4px 10px rgba(249, 115, 22, 0.28);
+  color: var(--ink-700);
 }
 
 .feature__title {
   font-size: var(--fs-xl);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink-900);
   margin-bottom: var(--sp-2);
 }

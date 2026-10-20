@@ -96,10 +96,10 @@ watch(
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(253, 252, 250, 0.75);
-  backdrop-filter: saturate(180%) blur(16px);
-  -webkit-backdrop-filter: saturate(180%) blur(16px);
-  border-bottom: 1px solid rgba(228, 228, 231, 0.7);
+  background: rgba(247, 245, 240, 0.86);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--hairline);
 }
 
 .nav__inner {
@@ -114,7 +114,7 @@ watch(
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  font-weight: 700;
+  font-weight: 600;
   font-size: var(--fs-xl);
   color: var(--ink-900);
   flex-shrink: 0;
@@ -124,14 +124,13 @@ watch(
   width: 32px;
   height: 32px;
   border-radius: var(--r-md);
-  background: var(--grad-brand);
+  background: var(--ink-900);
   display: grid;
   place-items: center;
-  box-shadow: var(--shadow-sm);
 }
 
 .nav__brand-name span {
-  color: var(--brand-500);
+  color: var(--brand-600);
 }
 
 .nav__links {
@@ -146,7 +145,9 @@ watch(
   font-size: var(--fs-md);
   color: var(--ink-600);
   font-weight: 500;
-  transition: all 0.15s var(--ease-out);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
   position: relative;
 }
 
@@ -168,7 +169,7 @@ watch(
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--brand-500);
+  background: var(--brand-600);
 }
 
 .nav__actions {

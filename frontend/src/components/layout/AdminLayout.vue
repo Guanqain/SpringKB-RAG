@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
@@ -18,6 +19,11 @@ function isActive(item: { to: string; exact?: boolean }) {
   if (item.exact) return p === item.to
   return p === item.to || p.startsWith(item.to + '/')
 }
+
+/** 主区顶部工具条显示当前页名（克制的面包屑式文字） */
+const currentLabel = computed(
+  () => items.find((item) => isActive(item))?.label ?? '管理后台',
+)
 </script>
 
 <template>
@@ -37,11 +43,18 @@ function isActive(item: { to: string; exact?: boolean }) {
     </aside>
 
     <main class="admin__main">
-      <router-view v-slot="{ Component }">
-        <transition name="page-fade" mode="out-in">
-          <component :is="Component" :key="route.path" />
-        </transition>
-      </router-view>
+      <div class="admin__toolbar">
+        <span class="admin__toolbar-crumb">管理后台</span>
+        <span class="admin__toolbar-sep">/</span>
+        <span class="admin__toolbar-title">{{ currentLabel }}</span>
+      </div>
+      <div class="admin__content">
+        <router-view v-slot="{ Component }">
+          <transition name="page-fade" mode="out-in">
+            <component :is="Component" :key="route.path" />
+          </transition>
+        </router-view>
+      </div>
     </main>
   </div>
 </template>
@@ -49,7 +62,7 @@ function isActive(item: { to: string; exact?: boolean }) {
 <style scoped>
 .admin {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  grid-template-columns: var(--admin-sidebar-w) 1fr;
   min-height: calc(100vh - 68px);
 }
 
@@ -61,7 +74,7 @@ function isActive(item: { to: string; exact?: boolean }) {
 
 .admin__side-title {
   font-size: var(--fs-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--ink-500);
   text-transform: uppercase;
@@ -80,18 +93,21 @@ function isActive(item: { to: string; exact?: boolean }) {
   cursor: pointer;
   margin-bottom: 2px;
   border-left: 3px solid transparent;
-  transition: all 0.15s var(--ease-out);
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
 }
 
 .admin__side-item:hover {
   color: var(--ink-100);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .admin__side-item--active {
   color: #fff;
-  background: rgba(249, 115, 22, 0.14);
-  border-left-color: var(--brand-500);
+  background: rgba(180, 83, 9, 0.1);
+  border-left-color: var(--brand-600);
 }
 
 .admin__side-dot {
@@ -104,14 +120,53 @@ function isActive(item: { to: string; exact?: boolean }) {
 }
 
 .admin__side-item--active .admin__side-dot {
-  background: var(--brand-500);
+  background: var(--brand-600);
   opacity: 1;
 }
 
 .admin__main {
-  padding: var(--sp-8);
-  background: var(--page-bg);
+  background: var(--admin-bg);
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin__toolbar {
+  height: 46px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-6);
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline);
+  font-size: var(--fs-sm);
+  color: var(--ink-400);
+}
+
+.admin__toolbar-sep {
+  color: var(--ink-300);
+}
+
+.admin__toolbar-title {
+  color: var(--ink-700);
+  font-weight: 600;
+}
+
+.admin__content {
+  padding: var(--sp-8);
+  min-width: 0;
+}
+
+/* 路由切换：仅轻微透明度变化，无位移 */
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.page-fade-enter-from,
+.page-fade-leave-to {
+  opacity: 0;
 }
 
 @media (max-width: 900px) {
@@ -138,7 +193,11 @@ function isActive(item: { to: string; exact?: boolean }) {
   }
 
   .admin__side-item--active {
-    border-bottom-color: var(--brand-500);
+    border-bottom-color: var(--brand-600);
+  }
+
+  .admin__content {
+    padding: var(--sp-5) var(--sp-4);
   }
 }
 </style>

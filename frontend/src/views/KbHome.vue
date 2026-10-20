@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import PageHead from '@/components/layout/PageHead.vue'
-// 知识库（外壳）：左体系树 + 右文档卡骨架。
-// 数据依赖未就绪后端（GET /api/kb/overview|tree|docs，见 spec §待确认 C7），
+// 知识库（外壳）：左体系树 + 右文档卡网格骨架。
+// 数据依赖未就绪后端（GET /api/kb/overview|tree|docs，见 spec §待确认 C4/C7），
 // 故节点/文档卡一律空态，不请求、不伪造数据；搜索框仅纯前端占位。
 const keyword = ref('')
 </script>
@@ -12,7 +12,7 @@ const keyword = ref('')
     <PageHead title="知识库" subtitle="按产品线 · 版本 · 来源浏览全部已收录文档" />
 
     <div class="kb-layout">
-      <!-- 左侧体系树骨架：产品线 ▸ 版本 ▸ 来源 三级结构，节点为空态 -->
+      <!-- 左：体系树骨架（产品线 ▸ 版本 ▸ 来源），节点为空态 -->
       <aside class="kb-tree">
         <input
           v-model="keyword"
@@ -21,27 +21,26 @@ const keyword = ref('')
           placeholder="筛选文档标题..."
           aria-label="筛选文档标题"
         />
-        <details open>
-          <summary>产品线</summary>
-          <div class="kb-tree__group">
-            <details open>
-              <summary>版本</summary>
-              <div class="kb-tree__group">
-                <div class="kb-tree__leaf">
-                  来源 <span class="kb-tree__count">—</span>
-                </div>
-              </div>
-            </details>
-          </div>
-        </details>
-        <p class="kb-tree__empty">知识库导航 · 待后端 /api/kb 就绪</p>
+
+        <nav class="kb-tree__nav" aria-label="体系树">
+          <div class="kb-tree__node kb-tree__node--top">产品线</div>
+          <div class="kb-tree__node kb-tree__node--mid">版本</div>
+          <div class="kb-tree__node kb-tree__node--leaf">来源</div>
+        </nav>
+
+        <div class="kb-tree__empty">
+          <p class="empty__text">知识还是一片空白 —— 从导入一批文档开始</p>
+          <router-link class="btn btn--primary" to="/admin/import">去导入</router-link>
+        </div>
       </aside>
 
-      <!-- 右侧文档卡网格：空态 -->
-      <div class="doc-grid">
-        <div class="card empty doc-grid__empty">
-          <p class="empty__title">暂无可浏览文档</p>
-          <p class="empty__hint">文档列表 · 待后端 /api/kb 就绪</p>
+      <!-- 右：文档卡网格骨架，空态 -->
+      <div class="kb-docs">
+        <div class="doc-grid">
+          <div class="doc-grid__empty">
+            <p class="empty__text">还没有文档 —— 你先写一篇，团队的知识就从它开始</p>
+            <router-link class="btn btn--primary" to="/editor">去写文档</router-link>
+          </div>
         </div>
       </div>
     </div>
@@ -54,136 +53,132 @@ const keyword = ref('')
   padding-bottom: var(--sp-16);
 }
 
+/* 白面面板 + 1px hairline；左右两栏由 hairline 竖分隔 */
 .kb-layout {
   display: grid;
-  grid-template-columns: 240px 1fr;
-  gap: var(--sp-6);
-  align-items: start;
-  padding-bottom: var(--sp-16);
+  grid-template-columns: 260px 1fr;
+  align-items: stretch;
+  min-height: 420px;
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  margin-bottom: var(--sp-16);
 }
 
 .kb-tree {
-  background: #fff;
-  border: 1px solid var(--ink-200);
-  border-radius: var(--r-xl);
-  padding: var(--sp-4);
-  position: sticky;
-  top: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-5);
+  border-right: 1px solid var(--hairline);
 }
 
 .kb-tree__search {
   width: 100%;
-  border: 1px solid var(--ink-200);
+  border: 1px solid var(--hairline);
   border-radius: var(--r-md);
   padding: var(--sp-2) var(--sp-3);
   font-size: var(--fs-sm);
   color: var(--ink-700);
-  background: #fff;
+  background: var(--surface);
   outline: none;
-  margin-bottom: var(--sp-3);
+  transition: box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.kb-tree__search::placeholder {
+  color: var(--ink-400);
 }
 
 .kb-tree__search:focus {
-  border-color: var(--brand-400);
+  box-shadow: var(--ring);
+  border-color: transparent;
 }
 
-.kb-tree details {
-  font-size: var(--fs-sm);
-}
-
-.kb-tree summary {
-  cursor: pointer;
-  list-style: none;
+.kb-tree__nav {
   display: flex;
-  align-items: center;
-  gap: var(--sp-1);
-  padding: 6px var(--sp-2);
-  border-radius: var(--r-sm);
-  color: var(--ink-700);
-  font-weight: 600;
-  user-select: none;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.kb-tree summary::-webkit-details-marker {
-  display: none;
-}
-
-.kb-tree summary:hover {
-  background: var(--ink-50);
-}
-
-.kb-tree summary::before {
-  content: '';
-  width: 0;
-  height: 0;
-  flex-shrink: 0;
-  border-left: 5px solid var(--ink-400);
-  border-top: 4px solid transparent;
-  border-bottom: 4px solid transparent;
-  transition: transform 0.15s var(--ease-out);
-}
-
-.kb-tree details[open] > summary::before {
-  transform: rotate(90deg);
-}
-
-.kb-tree__group {
-  margin-left: var(--sp-4);
-}
-
-.kb-tree__leaf {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 5px var(--sp-2) 5px var(--sp-3);
+.kb-tree__node {
+  padding: 6px var(--sp-3);
+  border-left: 2px solid transparent;
   border-radius: var(--r-sm);
   font-size: var(--fs-sm);
   color: var(--ink-500);
-  border-left: 2px solid transparent;
+  transition:
+    background-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
 }
 
-.kb-tree__count {
-  font-size: var(--fs-xs);
-  color: var(--ink-400);
-  font-weight: 400;
+.kb-tree__node:hover {
+  background: var(--surface-sunken);
+  color: var(--ink-700);
+}
+
+.kb-tree__node--top {
+  font-weight: 600;
+  color: var(--ink-700);
+}
+
+.kb-tree__node--mid {
+  margin-left: var(--sp-4);
+}
+
+.kb-tree__node--leaf {
+  margin-left: var(--sp-8);
+}
+
+.kb-tree__node--active {
+  border-left-color: var(--brand-600);
+  background: var(--surface-sunken);
+  color: var(--ink-900);
+  font-weight: 600;
 }
 
 .kb-tree__empty {
-  margin-top: var(--sp-3);
-  padding-top: var(--sp-3);
-  border-top: 1px dashed var(--ink-200);
-  font-size: var(--fs-xs);
-  color: var(--ink-400);
-  line-height: 1.6;
+  margin-top: auto;
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--sp-3);
+}
+
+.kb-tree__empty .empty__text {
+  font-size: var(--fs-sm);
+}
+
+.kb-docs {
+  padding: var(--sp-5);
 }
 
 .doc-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: var(--sp-4);
 }
 
 .doc-grid__empty {
   grid-column: 1 / -1;
-}
-
-.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-4);
+  min-height: 340px;
   text-align: center;
-  padding: var(--sp-12);
-  border: 1px dashed var(--ink-200);
-  box-shadow: none;
 }
 
-.empty__title {
+/* 空态：有态度的一句话 + 一个动作按钮 */
+.empty__text {
   font-size: var(--fs-lg);
-  font-weight: 700;
-  color: var(--ink-800);
-}
-
-.empty__hint {
-  margin-top: var(--sp-2);
-  font-size: var(--fs-md);
-  color: var(--ink-500);
+  font-weight: 600;
+  color: var(--ink-700);
+  line-height: 1.7;
+  max-width: 420px;
 }
 
 @media (max-width: 900px) {
@@ -192,11 +187,12 @@ const keyword = ref('')
   }
 
   .kb-tree {
-    position: static;
+    border-right: none;
+    border-bottom: 1px solid var(--hairline);
   }
 
-  .doc-grid {
-    grid-template-columns: 1fr;
+  .kb-tree__empty {
+    margin-top: var(--sp-4);
   }
 }
 </style>

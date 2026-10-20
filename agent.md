@@ -56,7 +56,8 @@ springKB/
 | D7 | **数据驱动 schema**：先爬真实文档再定表结构 | kb_document 字段依据 vuejs.org / docs.spring.io 真实元数据修订：`product`/`origin`+`authority`/`version`/`language`/`doc_type`/`last_modified` |
 | D8 | 爬虫按 source adapter 模式（`DocumentCrawler` 接口 + 每站一个实现） | 便于扩展任意数据源（工具文档、社区问答等） |
 | D9 | **v2 定位：私有化单实例知识库，隔离在部署边界，不做多租户**（2026-10-20 定稿） | 企业不愿机密上 SaaS；私有化下 tenant_id 是伪需求；物理隔离强于行级逻辑隔离（同 GitLab/Gitea 模型）。不做：多租户/平台公共区/关注评论/协同编辑/对外分享；做：admin·member 两角色 + 文档 private/team 两级可见 + UGC 权威加权（official 1.0 > ugc 0.9 > community 0.8）+ 新鲜度降权。详见 docs/v2产品规划.md + docs/详细设计_v2.md（v2.2） |
-| D10 | v2 前端以根目录 `demo.html` 原型为设计基准（8 视图 + 暖橘 token 体系） | 主导航仅 首页/问答/知识库，账户类入口收头像菜单，管理后台深色侧边栏独立形态；实现时从原型迁移组件与样式 |
+| D10 | v2 前端视觉基准由「暖橘 SaaS」**修订为「档案馆 / 书房」**（2026-10-20 v2.1 定稿） | 暖橘渐变/光斑/网格/卡片彩色投影与「私有化团队知识库」气质不符。v2.1 定：纸面 `#F7F5F0` + `1px` hairline 分层（卡片零阴影，阴影仅浮层）+ 深墨实底主操作 + 沉陶土 `#B45309` 极小面积强调（仅导航点/链接 hover/focus ring/信号点），高饱和亮橘只用于引用脉冲单点高光；问答页为**对话流**、管理端为**高密度中性控制台**。详见 docs/用户端前端设计.md v2.1 |
+| D11 | 角色体系目标（**待裁决，未实施**）：首个注册者 = 主管理员 → 其余注册 = MEMBER → 仅 ADMIN 可改角色 | 现状 `AuthService.DEFAULT_ROLE = "ADMIN"`（任何人注册即管理员）且 `/api/admin/**` 不校验角色。角色写入与鉴权必须**同批发布**，否则形成「普通成员仍可进管理端」的假安全。方案见 docs/用户端前端设计.md §9.1 |
 
 ## 5. 开发约定
 
@@ -113,6 +114,8 @@ curl -X POST http://localhost:8080/api/auth/register -H "Content-Type: applicati
 25. **TrustedHTML 与 string 类型不兼容**：`DOMPurify.sanitize()` 返回全局安全类型 `TrustedHTML`，与我们代码里 `interface RenderedPiece { html?: string }` 冲突。`as unknown as string` 显式转换即可——TrustedHTML 运行时就是字符串，v-html 也接受。
 26. **打字机逐字效果与 Markdown 不兼容**：逐字截断的 markdown 产生残缺 HTML（未闭合标签、表格断裂），无法正确渲染。对策：改为整段 fade-in 入场（opacity transition），保留视觉节奏但不破坏结构。
 27. **登录态残留导致回归误报**：浏览器 session 会保留上一会话的 `localStorage` token，未清空就测「未登录应跳转 /login」会得到「守卫失效」的假结论。**登录态相关回归项必须先 `localStorage.clear()` 重置**。同类误报：Vue scoped 样式会把 `@keyframes` 重命名为 `qa-pulse-<hash>`，断言动画名时须按**前缀**匹配而非全等；DevTools 自身的 highlighting 也会污染 `[class*=hl]` 类查询。
+28. **Markdown 中的引用角标必须整段渲染后内联替换**：按 `[n]` 切段再逐段 `marked.parse()`，每段都会被 `<p>` 包裹成**块级元素**，角标与后文被迫各占一行（`display:inline` 覆盖不了 `<p>`）。正确做法：**整段** `marked` → `DOMPurify`，再在 HTML 上把 `[n]` 替换为行内 `<sup>`；替换前用带捕获组的 `split` 切出 `<pre>`/`<code>` 段并原样跳过；注入发生在净化**之后**且只拼接数字常量，无新增注入面。v-html 内无法直接绑定事件 —— 用**事件委托**在容器上处理 click。
+29. **`role` 枚举大小写**：后端 JWT/`UserDto` 返回 `ADMIN` / `MEMBER`（大写），前端若写 `role === 'admin'` **永不命中**，表现为「已是管理员但不显示徽标」。一律归一化：`role?.toUpperCase() === 'ADMIN'`。另：当前注册接口对**所有注册者**返回 `ADMIN`（`AuthService.DEFAULT_ROLE`），属待裁决 C1/C3，前端不得据此做权限判断。
 
 ## 8. 进度状态
 
@@ -131,6 +134,8 @@ curl -X POST http://localhost:8080/api/auth/register -H "Content-Type: applicati
 - ✅ **v2 方向定稿（2026-10-20，决策见 D9/D10）**：经多轮讨论从「类 CSDN 社区 + RAG」→「多租户 SaaS」→ 收敛为 **私有化单实例团队知识库 + RAG**。两份 v2 文档重写至 v2.2：docs/v2产品规划.md（定位定稿 / 不做清单 / 权威三档加权 + 新鲜度公式 / V2.0~V2.4 阶段表 / 验收场景）、docs/详细设计_v2.md（无 tenant_id 的 schema 演进 / setup 向导 / 可见性统一谓词 / 分阶段门禁）。社交砍到点赞+收藏，关注/评论/多租户/公共区明确不做。
 - ✅ **demo.html 前端原型（2026-10-20）**：根目录单文件高保真原型，8 视图（首页/问答/知识库左树右卡/文档详情/Setup 向导/个人中心/写文档/管理后台），暖橘 token 体系 + 暖白底 #FDFCFA；头像菜单承载账户入口，管理后台深色侧边栏独立形态。作为 v2 全部前端页面的设计基准。
 - ✅ **v2 前端重建 + 迁移回归验收（2026-10-20，spec `rebuild-frontend-v2` Task 1~11 全过）**：以 `demo.html` 为基准**废弃 v1 管理端形态**——`theme.css` 重建暖橘 token（`--brand-500 #F97316`、暖白底 `#FDFCFA`、暖色投影）+ 覆盖 Element Plus 变量；`App.vue` 改为 NavBar + Footer 外壳（账户入口收头像菜单），管理端独立深色侧边栏；路由收敛为 `/`、`/qa`、`/kb`、`/kb/doc/:id`、`/login`、`/setup`、`/me`、`/editor`、`/admin/*`；迁移问答页 / 登录页 / 管理端（概览·文档管理·数据导入，接口与行为不变，active 提示文案仍取目标值），其余页面为**空态外壳（不伪造数据）**；删除 3 个旧视图 + `--kb-*` 兼容 token 块。回归 11 项浏览器实测全过、`npm run build` 通过。新坑 #27（登录态残留/动画名 hash 导致回归误报）。
+- ✅ **视觉基调 v2.1「档案馆 / 书房」+ 用户反馈修复（2026-10-20 晚）**：`theme.css` 重写为纸面 token（`--page-bg #F7F5F0` / `--hairline #E7E2D8` / 深墨 `--ink-900` / 沉陶土 `--brand-600`），**删除全部渐变与卡片阴影 token**（阴影仅 `--shadow-overlay*` 浮层）；问答页改**对话流**（右气泡 + 纸面答案 + 横向来源卡 + sticky 底部输入 + 三行灰条骨架）；管理端改中性控制台（220px 深墨侧边栏 / 4 统计卡 tabular-nums / 表格无竖线无斑马纹）；外壳页空态统一「一句话 + 动作按钮」。用户反馈 5 项已修：角标换行（整段渲染后内联 `<sup>` 替换，坑 #28）、`（官方）` 括号并入角标、历史序号改正序、Footer 仅首页、管理员徽标大小写（坑 #29）。回归 9 项浏览器实测全过 + `npm run build` 通过。
+- ⚠️ **待裁决：角色体系（C1/C3，ADR D11）**：现状注册即 `ADMIN`、`/api/admin/**` 不校验角色。建议方案（首注册者 = 主管理员 → 其余 MEMBER → 仅 ADMIN 改角色 → `/api/admin/**` 收敛 `hasRole('ADMIN')`）已写入 [docs/用户端前端设计.md](docs/用户端前端设计.md) §9.1，**本轮未改后端**。
 - ⏭️ **下一步**：**C1~C8 待确认清单待用户逐条裁决**（开放注册 / 问答免登录 / 无角色区分 / 文档可见性 / 权威三档 / 来源粒度 / DTO 字段 / 管理端能力，见 [docs/用户端前端设计.md](docs/用户端前端设计.md) §9）；裁决通过后进入 V2.0 编码（KbController overview/tree/docs/doc/:id + QaService 来源聚合 SourceRefV2 + /kb 左树右卡 + 文档详情 + 问答页来源卡文档级改造），门禁：聚合单测 + mvn test 全量 + 浏览器联调。
 
 ## 9. 开发日志索引
@@ -138,4 +143,4 @@ curl -X POST http://localhost:8080/api/auth/register -H "Content-Type: applicati
 | 日期 | 日志文件 | 主题 |
 | --- | --- | --- |
 | 2026-10-19 | [devlog/2026-10-19.md](./docs/devlog/2026-10-19.md) | 认证壳子打通；文档爬虫（3 源 adapter）；kb_document 数据驱动修订 |
-| 2026-10-20 | [devlog/2026-10-20.md](./docs/devlog/2026-10-20.md) | Task 1 导入链路：分块器 + 幂等入库 + 测试门禁 + 文档同步 ｜ Task 5 真实数据灌库 + 三条验证用例（$ 转义 / 爬虫字段缺口 / 百炼批量上限 3 坑） ｜ **Task 6 管理接口 + 前端联调（active 双写、URL 白名单防 SSRF、前端版本动态化、状态开关提示文案修复）** ｜ **Task 7 README 与架构图** ｜ **Task 8 Docker 一体化部署（dockerproxy 镜像源 + 8 项验收全过）** ｜ **用户端问答页 /qa（versions 端点 + 暖橘玻璃视觉 + 角标脉冲 + 问法阈值坑 #22/#23）** ｜ **v1 收尾：答案卡 Markdown 渲染 + 来源卡视觉降权（坑 #24~#26）** ｜ **v2 方向定稿（私有化单实例，ADR D9/D10）+ v2 文档重写 v2.2 + demo.html 8 视图原型** ｜ **v2 前端重建（暖橘 token + NavBar 外壳 + /admin 深色侧边栏）+ 迁移回归 11 项全过（坑 #27 回归误报）** |
+| 2026-10-20 | [devlog/2026-10-20.md](./docs/devlog/2026-10-20.md) | Task 1 导入链路：分块器 + 幂等入库 + 测试门禁 + 文档同步 ｜ Task 5 真实数据灌库 + 三条验证用例（$ 转义 / 爬虫字段缺口 / 百炼批量上限 3 坑） ｜ **Task 6 管理接口 + 前端联调（active 双写、URL 白名单防 SSRF、前端版本动态化、状态开关提示文案修复）** ｜ **Task 7 README 与架构图** ｜ **Task 8 Docker 一体化部署（dockerproxy 镜像源 + 8 项验收全过）** ｜ **用户端问答页 /qa（versions 端点 + 暖橘玻璃视觉 + 角标脉冲 + 问法阈值坑 #22/#23）** ｜ **v1 收尾：答案卡 Markdown 渲染 + 来源卡视觉降权（坑 #24~#26）** ｜ **v2 方向定稿（私有化单实例，ADR D9/D10）+ v2 文档重写 v2.2 + demo.html 8 视图原型** ｜ **v2 前端重建（暖橘 token + NavBar 外壳 + /admin 深色侧边栏）+ 迁移回归 11 项全过（坑 #27 回归误报）** ｜ **视觉基调 v2.1「档案馆 / 书房」（纸面 + hairline + 深墨 + 沉陶土）与用户反馈 5 修（角标换行/官方括号/序号正序/Footer 仅首页/管理员徽标，坑 #28/#29）** |

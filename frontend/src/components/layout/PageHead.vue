@@ -14,3 +14,11 @@ defineProps<{
     <p v-if="subtitle" class="page-head__sub">{{ subtitle }}</p>
   </header>
 </template>
+
+<style scoped>
+/* 页头底部 hairline 分隔（标题/副标题/面包屑沿用 theme.css 全局定义，不重复声明） */
+.page-head {
+  padding-bottom: var(--sp-6);
+  border-bottom: 1px solid var(--hairline);
+}
+</style>
