@@ -16,6 +16,7 @@ import AdminMembers from '@/views/admin/AdminMembers.vue'
 import AdminQaStats from '@/views/admin/AdminQaStats.vue'
 import AdminBlindspots from '@/views/admin/AdminBlindspots.vue'
 import AdminReview from '@/views/admin/AdminReview.vue'
+import AdminRagDebug from '@/views/admin/AdminRagDebug.vue'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -112,6 +113,12 @@ const routes: RouteRecordRaw[] = [
         name: 'admin-review',
         component: AdminReview,
         meta: { title: '待复审' },
+      },
+      {
+        path: 'rag-debug',
+        name: 'admin-rag-debug',
+        component: AdminRagDebug,
+        meta: { title: '检索诊断' },
       },
     ],
   },

@@ -28,21 +28,35 @@ public class IngestionService {
 
     private static final Logger log = LoggerFactory.getLogger(IngestionService.class);
 
-    /** source → 权威性（爬虫抓的均为官方站点；manual-* 为管理端手动导入，见 Task 6）。 */
-    static final Map<String, String> SOURCE_AUTHORITY = Map.of(
-            "vue", "official",
-            "springai", "official",
-            "springboot", "official",
-            "manual-official", "official",
-            "manual-community", "community");
+    /** source → 权威性（官方站点爬虫为 official；stackoverflow 为 community；manual-* 为管理端手动导入）。 */
+    static final Map<String, String> SOURCE_AUTHORITY = Map.ofEntries(
+            Map.entry("vue", "official"),
+            Map.entry("springai", "official"),
+            Map.entry("springboot", "official"),
+            Map.entry("springframework", "official"),
+            Map.entry("springsecurity", "official"),
+            Map.entry("springdatajpa", "official"),
+            Map.entry("vite", "official"),
+            Map.entry("vuerouter", "official"),
+            Map.entry("pinia", "official"),
+            Map.entry("stackoverflow", "community"),
+            Map.entry("manual-official", "official"),
+            Map.entry("manual-community", "community"));
 
     /** source → 来源站点域名。 */
-    static final Map<String, String> SOURCE_ORIGIN = Map.of(
-            "vue", "vuejs.org",
-            "springai", "spring.io",
-            "springboot", "spring.io",
-            "manual-official", "manual",
-            "manual-community", "stackoverflow.com");
+    static final Map<String, String> SOURCE_ORIGIN = Map.ofEntries(
+            Map.entry("vue", "vuejs.org"),
+            Map.entry("springai", "spring.io"),
+            Map.entry("springboot", "spring.io"),
+            Map.entry("springframework", "spring.io"),
+            Map.entry("springsecurity", "spring.io"),
+            Map.entry("springdatajpa", "spring.io"),
+            Map.entry("vite", "vite.dev"),
+            Map.entry("vuerouter", "router.vuejs.org"),
+            Map.entry("pinia", "pinia.vuejs.org"),
+            Map.entry("stackoverflow", "stackoverflow.com"),
+            Map.entry("manual-official", "manual"),
+            Map.entry("manual-community", "stackoverflow.com"));
 
     private static final String DEFAULT_AUTHORITY = "official";
     private static final String DEFAULT_DOC_TYPE = "reference";

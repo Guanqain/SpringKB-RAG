@@ -70,6 +70,9 @@ public class QaService {
     public QaResult ask(String question, String version, int topK) {
         int k = Math.max(1, topK);
         List<Document> candidates = ragSearchService.searchDocuments(question, version, Math.max(1, k * 3));
+        log.info("检索初检：question={} version={} topK={} 候选={} topScore={}",
+                question, version, k * 3, candidates.size(),
+                candidates.isEmpty() ? "-" : topScore(candidates));
         if (candidates.isEmpty() || topScore(candidates) < similarityThreshold) {
             log.info("兜底命中：初检 {} 条，最高相似度 {} < 阈值 {}，不调用模型 question={} version={}",
                     candidates.size(), candidates.isEmpty() ? "-" : topScore(candidates), similarityThreshold, question, version);
@@ -78,6 +81,7 @@ public class QaService {
 
         List<Document> reranked = ragSearchService.rerankAndTop(candidates, k);
         List<SourceRef> sources = resolveSources(reranked);
+        log.info("重排回源：重排后={} 条，回源成功={} 条，准备调用模型", reranked.size(), sources.size());
         if (sources.isEmpty()) {
             // 回源全部失败（理论不出现，kb_chunk 与 vector_store 同事务写入）；按兜底处理
             log.warn("回源失败：初检命中但 kb_chunk/kb_document 无对应行，按兜底处理 question={}", question);
@@ -140,7 +144,13 @@ public class QaService {
 
     private String generate(String question, String version, List<SourceRef> sources) {
         Prompt prompt = buildPrompt(question, version, sources);
-        return chatClient.prompt(prompt).call().content();
+        try {
+            return chatClient.prompt(prompt).call().content();
+        } catch (RuntimeException e) {
+            // 网络不通/超时等外部故障：转成明确的领域异常，由控制器映射 503，不混同为检索兜底
+            log.error("模型调用失败：question={} version={} 原因={}", question, version, e.getMessage(), e);
+            throw new ModelUnavailableException("模型服务暂时不可用", e);
+        }
     }
 
     /** 组装 prompt：System 消息强制引用规则，User 消息为【问题】+【检索内容】（编号与 sources 一致）。 */

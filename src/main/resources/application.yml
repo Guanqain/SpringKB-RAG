@@ -9,7 +9,16 @@ spring:
     init:
       mode: always
 
+  # 出站 HTTP 超时：模型/Embedding 调用默认无超时，网络不通时会永久占住请求线程
+  http:
+    client:
+      connect-timeout: 5s
+      read-timeout: 60s
+
   ai:
+    # 模型调用不自动重试：单次最坏 ≈65s，落在前端 90s 超时内，失败即返回 503 由用户手动重试
+    retry:
+      max-attempts: 1
     # Chat: DeepSeek；Embedding: 阿里云百炼（OpenAI 兼容模式）
     model:
       chat: deepseek
@@ -42,6 +51,7 @@ app:
   # 权威性加权（§6.3）：official 文档在初检相似度上加成；环境变量 APP_RAG_BOOST 可覆盖
   rag:
     boost: 0.15
+    similarity-threshold: 0.5
   jwt:
     secret: ${JWT_SECRET:dev-only-change-me-springkb-rag-2026-secret-key}
     expiration-hours: ${JWT_EXPIRATION_HOURS:24}

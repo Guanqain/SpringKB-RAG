@@ -31,6 +31,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -239,6 +240,24 @@ class QaServiceTest {
                 .andExpect(jsonPath("$.data.found").value(true))
                 .andExpect(jsonPath("$.data.answer").isNotEmpty())
                 .andExpect(jsonPath("$.data.sources[0].index").value(1));
+    }
+
+    // ---------- 7. 模型调用失败：转领域异常，控制器返回 503 而不是挂起 ----------
+    @Test
+    void modelFailureMapsTo503() throws Exception {
+        seedChunk("qa-f-" + uid(), "How to config CDS in Spring Boot",
+                "official", "3.x", "Spring Boot CDS", "deployment/cds");
+        when(callSpec.content()).thenThrow(new IllegalStateException("connection reset"));
+
+        assertThatThrownBy(() -> qaService.ask("如何配置 CDS", null, 5))
+                .isInstanceOf(ModelUnavailableException.class)
+                .hasCauseInstanceOf(IllegalStateException.class);
+
+        mockMvc.perform(post("/api/qa/ask").contentType(APPLICATION_JSON)
+                        .content("{\"question\":\"如何配置 CDS\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(503))
+                .andExpect(jsonPath("$.message").value("模型服务暂时不可用，请稍后重试"));
     }
 
     // ---------- helpers ----------

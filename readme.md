@@ -38,14 +38,14 @@ Spring 生态 + RAG 的知识库问答系统：面向官方文档版本割裂与
 
 ## 3. 验证结果
 
-| 能力 | 验证用例 | 结果 |
-| --- | --- | --- |
-| 版本过滤 | `createApp`（3.x）仅召回 3.x，双向交叉验证无泄漏 | ✅ |
-| 权威性加权 | graceful shutdown（4.2-SNAPSHOT）community 0.6748 被 official 0.6575+0.15 反超，community 保留第 3、4 名 | ✅ |
-| 无答案兜底 | 烘焙面包问题 → found=false + 兜底文案，零 Chat 调用 | ✅ |
-| 引用溯源 | createApp 回答带 [1][2][3] 引用，编号与 sources 一一对应 | ✅ |
+| 能力       | 验证用例                                                                                                 | 结果 |
+| ---------- | -------------------------------------------------------------------------------------------------------- | ---- |
+| 版本过滤   | `createApp`（3.x）仅召回 3.x，双向交叉验证无泄漏                                                       | ✅   |
+| 权威性加权 | graceful shutdown（4.2-SNAPSHOT）community 0.6748 被 official 0.6575+0.15 反超，community 保留第 3、4 名 | ✅   |
+| 无答案兜底 | 烘焙面包问题 → found=false + 兜底文案，零 Chat 调用                                                     | ✅   |
+| 引用溯源   | createApp 回答带 [1][2][3] 引用，编号与 sources 一一对应                                                 | ✅   |
 
-数据规模：**235 篇真实文档**（vue 80 / spring-ai 80 / spring-boot 73 官方 + 2 社区样本），**854 chunks / 856 向量行**。自动化测试 **42/42 通过**（分块 / 幂等 / 检索 / 重排 / 兜底 / 管理接口）。完整记录见 [docs/测试用例文档.md](docs/测试用例文档.md) 与 [docs/devlog/](docs/devlog/)。
+数据规模：**1445 篇真实文档**（官方 1192：spring-framework 465 / spring-security 156 / spring-boot 73 / spring-ai 80 / spring-data-jpa 35 / vue 80 / vue-router 167 / pinia 97 / vite 39；社区 253：Stack Overflow 251 + 2 注入样本），**3263 chunks / 3265 向量行**。自动化测试 **54/54 通过**（分块 / 幂等 / 检索 / 重排 / 兜底 / 管理接口 / 爬虫映射）。完整记录见 [docs/测试用例文档.md](docs/测试用例文档.md) 与 [docs/devlog/](docs/devlog/)。
 
 ## 4. 架构图
 
@@ -89,14 +89,14 @@ flowchart LR
 
 ## 5. 技术栈
 
-| 层 | 技术 | 说明 |
-| --- | --- | --- |
-| 后端 | Spring Boot 4.0.8（Java 17） | Jackson 3（tools.jackson） |
-| AI | Spring AI 2.0.0 | Chat（DeepSeek）+ Embedding（百炼 text-embedding-v4，1024 维）+ PgVectorStore |
-| 存储 | PostgreSQL 16 + pgvector | HNSW / 余弦相似度 |
-| 认证 | Spring Security 7 + JWT | 无状态 / BCrypt |
-| 前端 | Vue 3 + Vite 5 + Element Plus | Pinia + Vue Router + axios，独立工程 `frontend/` |
-| 部署 | Docker Compose | `rag-postgres`（63892） |
+| 层   | 技术                          | 说明                                                                          |
+| ---- | ----------------------------- | ----------------------------------------------------------------------------- |
+| 后端 | Spring Boot 4.0.8（Java 17）  | Jackson 3（tools.jackson）                                                    |
+| AI   | Spring AI 2.0.0               | Chat（DeepSeek）+ Embedding（百炼 text-embedding-v4，1024 维）+ PgVectorStore |
+| 存储 | PostgreSQL 16 + pgvector      | HNSW / 余弦相似度                                                             |
+| 认证 | Spring Security 7 + JWT       | 无状态 / BCrypt                                                               |
+| 前端 | Vue 3 + Vite 5 + Element Plus | Pinia + Vue Router + axios，独立工程 `frontend/`                            |
+| 部署 | Docker Compose                | `rag-postgres`（63892）                                                     |
 
 ## 6. 快速启动
 
@@ -131,7 +131,7 @@ springKB/
 │   ├── dto/             # 请求/响应对象
 │   ├── security/        # JWT 工具与过滤器
 │   ├── config/          # SecurityConfig / ChatClientConfig
-│   ├── crawler/         # 文档爬虫（Vue / SpringAI / SpringBoot 三源适配器）
+│   ├── crawler/         # 文档爬虫（10 个源适配器：Spring 全家桶 / Vue 生态 / Stack Overflow）
 │   ├── ingestion/       # 导入链路（ChunkSplitter / IngestionService / ImportRunner）
 │   ├── rag/             # 检索 / 重排 / 兜底 / 问答（QaService / RagSearchService / Reranker）
 │   ├── manage/          # 管理接口（AdminService / AdminController）
@@ -148,15 +148,15 @@ springKB/
 ./mvnw test    # 42 例全量通过（真实 Postgres 测试库 springkb_test + 确定性 mock Embedding）
 ```
 
-| 测试类 | 用例数 | 覆盖 |
-| --- | --- | --- |
-| ChunkSplitterTest | 8 | 分块边界 / 代码围栏 / `$` 与反斜杠内容清洗 |
-| IngestionServiceTest + BatchTest | 5 | 幂等 / 双字段一致 / 向量对齐 / 分批上限 |
-| RagSearchServiceTest | 7 | 版本过滤 / 下推证明 / inactive / 注入防护 |
-| RerankerTest | 5 | official 排前 / 同分稳定 / 溢出 / 空候选 |
-| QaServiceTest + Fallback | 6 | 兜底零调用 / 引用对齐 / 越界保护 / 阈值参数化 |
-| AdminApiTest | 9 | 未登录 401 / 导入幂等 / active 双写 / SSRF 白名单 / 删除级联 |
-| 其他（context 等） | 2 | 应用上下文 / 契约 |
+| 测试类                           | 用例数 | 覆盖                                                         |
+| -------------------------------- | ------ | ------------------------------------------------------------ |
+| ChunkSplitterTest                | 8      | 分块边界 / 代码围栏 / `$` 与反斜杠内容清洗                 |
+| IngestionServiceTest + BatchTest | 5      | 幂等 / 双字段一致 / 向量对齐 / 分批上限                      |
+| RagSearchServiceTest             | 7      | 版本过滤 / 下推证明 / inactive / 注入防护                    |
+| RerankerTest                     | 5      | official 排前 / 同分稳定 / 溢出 / 空候选                     |
+| QaServiceTest + Fallback         | 6      | 兜底零调用 / 引用对齐 / 越界保护 / 阈值参数化                |
+| AdminApiTest                     | 9      | 未登录 401 / 导入幂等 / active 双写 / SSRF 白名单 / 删除级联 |
+| 其他（context 等）               | 2      | 应用上下文 / 契约                                            |
 
 ## 9. 已知限制
 
