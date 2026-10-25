@@ -51,8 +51,8 @@ public class SecurityConfig {
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
-                // 用户侧公开接口：demo 冒烟 + 后续问答
-                .requestMatchers("/api/demo/**", "/api/qa/**").permitAll()
+                // 用户侧公开接口：demo 冒烟 + 问答 + 知识库导航（只读）
+                .requestMatchers("/api/demo/**", "/api/qa/**", "/api/kb/**").permitAll()
                 // 前端页面与静态资源（容器一体化部署模式：前端产物托管于 static/）
                 .requestMatchers("/", "/index.html", "/login", "/documents/**",
                         "/assets/**", "/favicon.ico", "/vite.svg").permitAll()

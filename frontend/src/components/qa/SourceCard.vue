@@ -21,8 +21,15 @@ const props = defineProps<{
       {{ [props.source.section, props.source.headingPath].filter(Boolean).join(' › ') || '—' }}
     </div>
     <p class="src__snip">{{ props.source.snippet }}</p>
-    <!-- 原文链接依赖 §9 C6（SourceRef 无 originalUrl）：契约未就绪 → 禁用态 + 提示，不伪造 URL -->
-    <span class="src__open" title="原文链接待后端就绪">打开原文</span>
+    <!-- 原文跳转（§9 C6）：originalUrl 就绪为可点外链，否则禁用态不伪造 URL -->
+    <a
+      v-if="props.source.originalUrl"
+      class="src__open"
+      :href="props.source.originalUrl"
+      target="_blank"
+      rel="noopener noreferrer"
+    >打开原文</a>
+    <span v-else class="src__open src__open--disabled" title="原文链接不可用">打开原文</span>
   </div>
 </template>
 
@@ -100,12 +107,27 @@ const props = defineProps<{
   overflow: hidden;
 }
 
-/* 「打开原文」：C6 未就绪 → 禁用态文本，不可点击 */
+/* 「打开原文」：originalUrl 就绪 → 可点外链；否则禁用态文本 */
 .src__open {
   margin-top: var(--sp-3);
   font-size: var(--fs-sm);
+  color: var(--brand-600);
+  text-decoration: none;
+}
+
+.src__open:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--brand-600);
+  text-underline-offset: 2px;
+}
+
+.src__open--disabled {
   color: var(--ink-400);
   cursor: not-allowed;
   user-select: none;
+}
+
+.src__open--disabled:hover {
+  text-decoration: none;
 }
 </style>

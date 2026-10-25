@@ -31,9 +31,13 @@ services:
       SPRING_DATASOURCE_PASSWORD: ragpass
       # API Key 与 JWT 密钥从宿主机环境变量透传（可留空，问答/灌库功能才需要）
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
       JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-springkb-rag-2026-secret-key}
       SPRING_PROFILES_ACTIVE: dev
+      # Embedding 走宿主机上的 Ollama：容器内的 127.0.0.1 不是宿主机，需用 host.docker.internal
+      SPRING_AI_OPENAI_BASE_URL: http://host.docker.internal:11434/v1
+      SPRING_AI_OPENAI_API_KEY: ollama
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8080:8080"
     restart: unless-stopped

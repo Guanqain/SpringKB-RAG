@@ -19,7 +19,7 @@ spring:
     # 模型调用不自动重试：单次最坏 ≈65s，落在前端 90s 超时内，失败即返回 503 由用户手动重试
     retry:
       max-attempts: 1
-    # Chat: DeepSeek；Embedding: 阿里云百炼（OpenAI 兼容模式）
+    # Chat: DeepSeek；Embedding: 本地 Ollama（跨语言模型，OpenAI 兼容端点）
     model:
       chat: deepseek
       embedding: openai
@@ -28,15 +28,16 @@ spring:
       chat:
         model: deepseek-chat
     openai:
-      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
-      # 仅用百炼做 Embedding，Chat 由 DeepSeek 提供，避免产生两个 ChatModel
+      # Ollama 的 OpenAI 兼容端点；官方 OpenAI SDK 约定 base-url 需包含 /v1
+      base-url: http://127.0.0.1:11434/v1
+      # 仅用 Ollama 做 Embedding，Chat 由 DeepSeek 提供，避免产生两个 ChatModel
       chat:
         enabled: false
       embedding:
         options:
-          # 维度一旦确定后勿随意更换（需重建向量表）
-          model: text-embedding-v4
-          dimensions: 1024
+          # 跨语言向量模型：中英共用同一语义空间，中文查询可直接命中英文文档
+          # 维度 1024 与 pgvector 表一致；换模型必须重建向量表
+          model: qwen3-embedding:0.6b
     vectorstore:
       pgvector:
         dimensions: 1024
@@ -55,4 +56,8 @@ app:
   jwt:
     secret: ${JWT_SECRET:dev-only-change-me-springkb-rag-2026-secret-key}
     expiration-hours: ${JWT_EXPIRATION_HOURS:24}
+  # 问答会话：窗口只保留最近 N 轮，TTL 天无新消息自动清理（防止僵尸会话堆积）
+  conversation:
+    window-size: ${CONVERSATION_WINDOW_SIZE:10}
+    ttl-days: ${CONVERSATION_TTL_DAYS:30}
 

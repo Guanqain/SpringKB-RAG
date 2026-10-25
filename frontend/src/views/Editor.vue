@@ -1,8 +1,41 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-// 写文档（外壳）：顶栏 + 大标题输入 + 元信息 radio 卡 + 密钥扫描提示条 + 左右分栏。
-// 发布通道未就绪（C8：/api/ugc/*）→ 发布按钮禁用 + 说明；页面不发起任何请求。
+import { ElMessage } from 'element-plus'
+import { publishUgcDocument } from '@/api/ugc'
+import { renderMarkdown } from '@/utils/markdown'
+
 const router = useRouter()
+
+const title = ref('')
+const markdown = ref('')
+const visibility = ref<'team' | 'private'>('team')
+const publishing = ref(false)
+
+const previewHtml = computed(() => renderMarkdown(markdown.value))
+
+async function publish() {
+  if (!title.value.trim()) {
+    ElMessage.warning('请先填写文档标题')
+    return
+  }
+  if (!markdown.value.trim()) {
+    ElMessage.warning('请先填写正文')
+    return
+  }
+  publishing.value = true
+  try {
+    // visibility 属 C4（私有化可见性），后端 schema 暂未落库，先不随请求提交
+    const result = await publishUgcDocument({
+      title: title.value.trim(),
+      markdown: markdown.value,
+    })
+    ElMessage.success(`发布成功，共 ${result.chunkCount} 个片段`)
+    void router.push(`/kb/doc/${result.docId}`)
+  } finally {
+    publishing.value = false
+  }
+}
 </script>
 
 <template>
@@ -11,12 +44,15 @@ const router = useRouter()
       <button class="editor__back" type="button" @click="router.back()">返回</button>
       <span class="editor__topbar-title">写文档</span>
       <div class="editor__topbar-actions">
-        <span class="editor__note">发布能力还没接上 —— 这里写的内容还不会保存</span>
-        <button class="btn btn--primary" type="button" disabled title="发布能力还没接上">发布</button>
+        <span v-if="!publishing" class="editor__note">可见性暂未生效（私有化可见性后续接入）</span>
+        <button class="btn btn--primary" type="button" :disabled="publishing" @click="publish">
+          {{ publishing ? '发布中...' : '发布' }}
+        </button>
       </div>
     </div>
 
     <input
+      v-model="title"
       class="editor__title-input"
       type="text"
       placeholder="输入文档标题..."
@@ -27,12 +63,12 @@ const router = useRouter()
       <span class="editor__meta-label">可见性</span>
       <div class="meta-cards">
         <label class="meta-card">
-          <input class="meta-card__radio" type="radio" name="visibility" value="team" />
+          <input v-model="visibility" class="meta-card__radio" type="radio" name="visibility" value="team" />
           <span class="meta-card__title">团队可见</span>
           <span class="meta-card__desc">进入知识库，团队成员都能检索到</span>
         </label>
         <label class="meta-card">
-          <input class="meta-card__radio" type="radio" name="visibility" value="private" />
+          <input v-model="visibility" class="meta-card__radio" type="radio" name="visibility" value="private" />
           <span class="meta-card__title">仅自己可见</span>
           <span class="meta-card__desc">只有你本人能在知识库中看到它</span>
         </label>
@@ -50,6 +86,7 @@ const router = useRouter()
       <div class="editor__pane">
         <div class="editor__pane-head">Markdown</div>
         <textarea
+          v-model="markdown"
           class="editor__textarea"
           placeholder="在这里写 Markdown —— 标题、段落、代码块..."
           aria-label="Markdown 正文"
@@ -57,7 +94,8 @@ const router = useRouter()
       </div>
       <div class="editor__pane">
         <div class="editor__pane-head">实时预览</div>
-        <div class="editor__preview">写下的内容会在这里实时排版。</div>
+        <div v-if="previewHtml" class="editor__preview md-body" v-html="previewHtml" />
+        <div v-else class="editor__preview">写下的内容会在这里实时排版。</div>
       </div>
     </div>
   </section>
@@ -81,6 +119,10 @@ const router = useRouter()
   color: var(--ink-500);
   font-size: var(--fs-md);
   flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
 }
 
 .editor__back:hover {
@@ -283,6 +325,12 @@ const router = useRouter()
   font-size: var(--fs-sm);
   line-height: 1.7;
   color: var(--ink-400);
+  overflow-y: auto;
+}
+
+.editor__preview.md-body {
+  color: var(--ink-700);
+  font-size: var(--fs-md);
 }
 
 .btn[disabled] {
@@ -317,5 +365,82 @@ const router = useRouter()
     grid-template-columns: 1fr;
     width: 100%;
   }
+}
+</style>
+
+<!-- 预览区 Markdown 排版（非 scoped：v-html 插入的 HTML 不被 scoped 命中） -->
+<style>
+.editor .md-body h1,
+.editor .md-body h2,
+.editor .md-body h3,
+.editor .md-body h4 {
+  font-weight: 600;
+  color: var(--ink-900);
+  margin: 16px 0 8px;
+}
+
+.editor .md-body h1 {
+  font-size: var(--fs-2xl);
+}
+
+.editor .md-body h2 {
+  font-size: var(--fs-xl);
+}
+
+.editor .md-body h3,
+.editor .md-body h4 {
+  font-size: var(--fs-lg);
+}
+
+.editor .md-body p {
+  margin: 8px 0;
+}
+
+.editor .md-body ul,
+.editor .md-body ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.editor .md-body li {
+  margin: 4px 0;
+}
+
+.editor .md-body code {
+  font-family: var(--font-num);
+  font-size: var(--fs-sm);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--ink-100);
+  color: var(--ink-800);
+}
+
+.editor .md-body pre {
+  margin: 10px 0;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  background: var(--ink-900);
+  overflow-x: auto;
+}
+
+.editor .md-body pre code {
+  padding: 0;
+  background: transparent;
+  color: var(--ink-100);
+}
+
+.editor .md-body blockquote {
+  margin: 10px 0;
+  padding: 8px 14px;
+  border-left: 2px solid var(--hairline-strong);
+  background: var(--surface-sunken);
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  color: var(--ink-600);
+}
+
+.editor .md-body a {
+  color: var(--brand-600);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 </style>

@@ -1,6 +1,7 @@
 package com.guangqian.springkb.rag;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -220,9 +221,31 @@ class QaServiceTest {
         assertThat(result.answer()).contains("[9]");
     }
 
-    // ---------- 5. 阈值参数化见 QaServiceFallbackTest（阈值 1.0 需独立上下文） ----------
+    // ---------- 5. 文档级聚合（C6）：同一文档多 chunk 合并为一条来源，携带 docId/originalUrl ----------
+    @Test
+    void chunksOfSameDocumentAggregateToOneSource() {
+        stubAnswer("[1] 官方文档说明配置步骤。");
+        String docId = "qa-agg-" + uid();
+        seedMultiChunk(docId, "official", "3.x", "Spring Boot CDS", "deployment/cds",
+                "How to config CDS in Spring Boot - part one",
+                "How to setup CDS in Spring Boot - part two");
 
-    // ---------- 6. 控制器契约：question 必填 400；合法请求 code=0 且 data.found 正确 ----------
+        QaResult result = qaService.ask("如何配置 CDS", null, 5);
+
+        assertThat(result.found()).isTrue();
+        assertThat(result.sources()).hasSize(1);
+        SourceRef s = result.sources().get(0);
+        assertThat(s.index()).isEqualTo(1);
+        assertThat(s.docId()).isEqualTo(docId);
+        // docKey 为 /qa/{docId}.html，spring-boot 重建为 docs.spring.io 原文外链
+        assertThat(s.originalUrl())
+                .isEqualTo("https://docs.spring.io/spring-boot/3.x/reference/qa/" + docId + ".html");
+        assertThat(s.snippet()).contains("part one").contains("part two");
+    }
+
+    // ---------- 6. 阈值参数化见 QaServiceFallbackTest（阈值 1.0 需独立上下文） ----------
+
+    // ---------- 7. 控制器契约：question 必填 400；合法请求 code=0 且 data.found 正确 ----------
     @Test
     void controllerValidatesQuestionAndReturnsFound() throws Exception {
         mockMvc.perform(post("/api/qa/ask").contentType(APPLICATION_JSON).content("{}"))
@@ -242,7 +265,7 @@ class QaServiceTest {
                 .andExpect(jsonPath("$.data.sources[0].index").value(1));
     }
 
-    // ---------- 7. 模型调用失败：转领域异常，控制器返回 503 而不是挂起 ----------
+    // ---------- 8. 模型调用失败：转领域异常，控制器返回 503 而不是挂起 ----------
     @Test
     void modelFailureMapsTo503() throws Exception {
         seedChunk("qa-f-" + uid(), "How to config CDS in Spring Boot",
@@ -301,12 +324,47 @@ class QaServiceTest {
                     (id, product, title, origin, authority, version, doc_key, doc_type, language, section, active)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true)
                 """, docId, "spring-boot", title, "spring.io", authority, version,
-                "/qa/" + docId + ".html", "reference", "en", section);
+                "/qa/" + docId, "reference", "en", section);
         jdbcTemplate.update("""
                 INSERT INTO kb_chunk (id, doc_id, ordinal, heading_path, content_markdown, content_text, token_count, image_refs)
                 VALUES (?, ?, 0, ?, ?, ?, 0, '[]'::jsonb)
                 """, chunkId, docId, section == null ? "" : section, text, text);
         return chunkId;
+    }
+
+    /** 单文档多 chunk 种子：一个 kb_document + N 个 kb_chunk/vector_store（ordinal 递增），验证文档级聚合。 */
+    private void seedMultiChunk(String docId, String authority, String version, String title, String section, String... texts) {
+        List<Document> docs = new ArrayList<>();
+        for (int i = 0; i < texts.length; i++) {
+            String chunkId = docId + "-" + i;
+            docs.add(Document.builder()
+                    .id(chunkId)
+                    .text(texts[i])
+                    .metadata(Map.of(
+                            "doc_id", docId,
+                            "product", "spring-boot",
+                            "origin", "spring.io",
+                            "authority", authority,
+                            "version", version,
+                            "active", "true",
+                            "doc_type", "reference",
+                            "language", "en",
+                            "title", title))
+                    .build());
+        }
+        vectorStore.add(docs);
+        jdbcTemplate.update("""
+                INSERT INTO kb_document
+                    (id, product, title, origin, authority, version, doc_key, doc_type, language, section, active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true)
+                """, docId, "spring-boot", title, "spring.io", authority, version,
+                "/qa/" + docId, "reference", "en", section);
+        for (int i = 0; i < texts.length; i++) {
+            jdbcTemplate.update("""
+                    INSERT INTO kb_chunk (id, doc_id, ordinal, heading_path, content_markdown, content_text, token_count, image_refs)
+                    VALUES (?, ?, ?, ?, ?, ?, 0, '[]'::jsonb)
+                    """, docId + "-" + i, docId, i, section == null ? "" : section, texts[i], texts[i]);
+        }
     }
 
     private static String uid() {

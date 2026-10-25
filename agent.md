@@ -16,7 +16,7 @@ Spring 生态 + RAG 的知识库问答系统：多版本文档管理、**版本�
 | 后端 | Spring Boot | 4.0.8（Java 17） |
 | AI 框架 | Spring AI | 2.0.0（BOM 管理） |
 | Chat | DeepSeek | `deepseek-chat` |
-| Embedding | 阿里云百炼（OpenAI 兼容） | `text-embedding-v4` / 1024 维 |
+| Embedding | 本地 Ollama（OpenAI 兼容） | `qwen3-embedding:0.6b` / 1024 维 / 中英跨语言 |
 | 向量库 | PostgreSQL 16 + pgvector | HNSW / COSINE_DISTANCE |
 | 认证 | Spring Security 7 + JWT | jjwt 0.12.6 / HS256 / 无状态 |
 | 前端 | Vue 3 + Vite 5 + Element Plus | Pinia + Vue Router + axios |
@@ -35,6 +35,8 @@ springKB/
 │   ├── security/        # JWT 工具与过滤器（JwtUtil / JwtAuthFilter）
 │   ├── config/          # Spring 配置（SecurityConfig / ChatClientConfig）
 │   ├── rag/             # 检索问答（RagSearchService / Reranker / QaService / RagTraceService 诊断）
+│   ├── kb/              # 知识库导航与 UGC（KbService 分页/详情/我的文档/收藏，UgcService 真实入库）
+│   ├── me/              # 个人中心能力（ConversationService 会话持久化，InteractionService 点赞收藏）
 │   ├── crawler/         # 文档爬虫（source adapter：Vue / SpringAI / SpringBoot）
 │   ├── ingestion/       # 导入链路（ChunkSplitter 分块 + IngestionService 幂等入库 + ImportRunner）
 │   ├── common/          # 通用（ApiResponse 统一响应）
@@ -51,7 +53,7 @@ springKB/
 | D1 | JSON 统一使用 **Jackson 3（tools.jackson）** | Spring Boot 4 内置 Jackson 3，不再自动提供 Jackson 2 的 `ObjectMapper` bean；`spring-boot-starter-json` 是 Jackson 3 的唯一来源，**勿删** |
 | D2 | PostgreSQL 取自增主键用 `INSERT ... RETURNING id` | `KeyHolder.getKey()` 在多列返回键时抛 `InvalidDataAccessApiUsageException` |
 | D3 | 认证：JWT 无状态 + BCrypt，token 存前端 localStorage | 登录态保留与刷新恢复 |
-| D4 | 百炼 Embedding 走 OpenAI 兼容模式（`spring-ai-starter-model-openai`） | dashscope starter 存在缺类问题 |
+| D4 | Embedding：**本地 Ollama `qwen3-embedding:0.6b`** 走 OpenAI 兼容模式（`spring-ai-starter-model-openai`，base-url 含 `/v1`） | 原百炼 `text-embedding-v4` 中英向量未对齐，中文搜不到英文文档；换跨语言模型覆盖中英混合语料（2026-10-25，见坑 #33）。百炼 dashscope starter 另有缺类问题 |
 | D5 | 容器手动 / compose 启动参数统一为 `rag-postgres:63892` | 避免数据卷与端口冲突 |
 | D6 | 后端按 controller / service / repository / entity / dto / security / config 分层 | 便于开发人员理解与维护 |
 | D7 | **数据驱动 schema**：先爬真实文档再定表结构 | kb_document 字段依据 vuejs.org / docs.spring.io 真实元数据修订：`product`/`origin`+`authority`/`version`/`language`/`doc_type`/`last_modified` |
@@ -59,6 +61,12 @@ springKB/
 | D9 | **v2 定位：私有化单实例知识库，隔离在部署边界，不做多租户**（2026-10-20 定稿） | 企业不愿机密上 SaaS；私有化下 tenant_id 是伪需求；物理隔离强于行级逻辑隔离（同 GitLab/Gitea 模型）。不做：多租户/平台公共区/关注评论/协同编辑/对外分享；做：admin·member 两角色 + 文档 private/team 两级可见 + UGC 权威加权（official 1.0 > ugc 0.9 > community 0.8）+ 新鲜度降权。详见 docs/v2产品规划.md + docs/详细设计_v2.md（v2.2） |
 | D10 | v2 前端视觉基准由「暖橘 SaaS」**修订为「档案馆 / 书房」**（2026-10-20 v2.1 定稿） | 暖橘渐变/光斑/网格/卡片彩色投影与「私有化团队知识库」气质不符。v2.1 定：纸面 `#F7F5F0` + `1px` hairline 分层（卡片零阴影，阴影仅浮层）+ 深墨实底主操作 + 沉陶土 `#B45309` 极小面积强调（仅导航点/链接 hover/focus ring/信号点），高饱和亮橘只用于引用脉冲单点高光；问答页为**对话流**、管理端为**高密度中性控制台**。详见 docs/用户端前端设计.md v2.1 |
 | D11 | 角色体系目标（**待裁决，未实施**）：首个注册者 = 主管理员 → 其余注册 = MEMBER → 仅 ADMIN 可改角色 | 现状 `AuthService.DEFAULT_ROLE = "ADMIN"`（任何人注册即管理员）且 `/api/admin/**` 不校验角色。角色写入与鉴权必须**同批发布**，否则形成「普通成员仍可进管理端」的假安全。方案见 docs/用户端前端设计.md §9.1 |
+| D12 | 原文 URL 不落库，用纯函数 `OriginalUrlResolver` 在读取时重建（2026-10-25） | `kb_document` 无 url 列；`origin` 只存站点域名、`doc_key` 已去版本段与 `.html`。重建失败（manual/ugc/未知站点）返回 `null`，前端据此隐藏「打开原文」，避免垃圾 URL。载体：来源聚合的 `SourceRef.originalUrl` 与知识库详情 `KbDocDetail.originalUrl` |
+| D13 | 来源聚合粒度 = **文档级**；UGC 上传 = **真实入库**（2026-10-25） | 问答来源「一条 = 一篇文档」，同文档多 chunk 按 docId 合并（score 取最大、markdown `\n\n` 拼接、首次出现顺序编号）；UGC 走现有 `IngestionService`（`source="ugc"` → `authority=community` / `origin=team`），非前端假提交 |
+| D14 | 文档列表分页**不引入 PageHelper**，改用项目既有 `PageResult` + `LIMIT/OFFSET`（2026-10-25） | Spring Boot 4 无官方兼容的 PageHelper starter，引入第三方分页插件收益低且风险高；`KbService.docsPage` 与全量 `docs` 共用同一 WHERE，`total` 用同参数 count 查询，`page≥1` / `size∈[1,100]` 服务端钳制 |
+| D15 | 问答历史会话 **PostgreSQL 持久化**：窗口 10 轮 + TTL 30 天（2026-10-25） | 表 `kb_conversation` / `kb_message`（级联删除）；每轮追加后按自增 id 保留最近 `app.conversation.window-size`（默认 10）条，超出删最旧；`list`/`create` 时清理 `updated_at` 超过 `app.conversation.ttl-days`（默认 30）的会话，防僵尸会话。所有读写都带 `username` 条件，跨用户一律 404 |
+| D16 | 点赞 / 收藏：**登录可操作、计数公开**；幂等写（2026-10-25） | 复合主键 `(doc_id, username)` + `ON CONFLICT DO NOTHING`，重复点赞不报错也不重复计数；`/api/kb/doc/{id}` 对匿名只返回计数（`liked`/`favorited` 为 false），登录后返回该用户状态 |
+| D17 | UGC 文档归属用 `kb_document.author` 列（幂等 `ALTER ... ADD COLUMN IF NOT EXISTS`，2026-10-25） | 原表无作者字段，导致「写入成功但个人中心看不到」；UGC 发布在同一事务内回写 `author`，失败整体回滚；爬虫/管理端导入保持 `NULL` |
 
 ## 5. 开发约定
 
@@ -94,7 +102,7 @@ curl -X POST http://localhost:8080/api/auth/register -H "Content-Type: applicati
 4. **容器端口冲突**：务必统一用 `63892`（compose 与手动 `docker run` 保持一致）。
 5. **PowerShell 调 curl 引号问题**：`\"` 会被破坏导致 JSON 解析失败；调试用 `Invoke-RestMethod` 或单引号。
 6. **RAG 分块（最高危）**：必须按 headings 切，块 500~1000 token，禁止按字符数硬切（会截断表格/代码/句子）；每块带 heading_path。
-7. **Embedding 维度一锤子买卖**：text-embedding-v4=1024 维，入库后维度不可变；换模型必须重建向量库；query 与文档必须同一模型。
+7. **Embedding 维度一锤子买卖**：`text-embedding-v4`=1024 维、现行 `qwen3-embedding:0.6b` 同为 1024 维，入库后维度不可变；换模型必须重建向量库；query 与文档必须同一模型。
 8. **metadata 过滤必须下推**：active/version 过滤写在 pgvector 的 SQL WHERE 层，禁止先召回后过滤（会漏掉最相关的）。
 9. **检索兜底**：相似度低于阈值要答「知识库未收录」，禁止模型硬编。
 10. **幻觉与溯源**：prompt 约束「只依据检索内容回答」；回答必须带 chunk 来源引用；检索块要精炼防超长上下文。
@@ -120,6 +128,10 @@ curl -X POST http://localhost:8080/api/auth/register -H "Content-Type: applicati
 30. **短查询天然低分，不是检索链路故障**：实测 `Spring AI` topScore 0.5563（<0.65 兜底）、`How to use ChatClient in Spring AI` 0.8535（通过）。1~3 个词的查询与长文档 chunk 的余弦相似度偏低是 Embedding 模型特性，排查「搜不到」先看 `/api/qa/debug` 的 `threshold` 段，别先怀疑 pgvector 或维度。另：`section` / `heading_path` **不在 vector_store.metadata**（只有 title/active/doc_id/origin/product/version/doc_type/language/authority），前端或诊断接口需要标题路径时必须回源 `kb_chunk`。
 31. **docs.spring.io 的 sitemap 混合两类 URL**：同一个 sitemap 里既有 `/{version}/...`（7.1-SNAPSHOT / 6.2 等多版本），也有**不带版本目录的当前页**（如 `.../reference/web/webflux-cors.html`）。把首段一律当版本号会得到 `version=web` / `docKey=webflux-cors` 这类脏元数据，且「取最大版本」会选中字典序更大的单词。对策：版本目录必须匹配 `^\d+(\.\d+)*(-[A-Za-z0-9.]+)?$`，只保留版本化页面并取版本号最大的一版（`AbstractSpringReferenceCrawler`）；导入 id 为 `{product}-{version}-{docKey}`，版本错了会整批算新文档。
 32. **模型调用无超时会挂死请求线程**：Spring AI 的 `RestClient` 默认无连接/读取超时，外网（`api.deepseek.com:443`）不可达时线程永久阻塞在 `QaService#generate`，表现为「控制层 return 卡住 + 前端超时 + 后端日志看似处理完成」。对策已落地：`spring.http.client.connect-timeout=5s` / `read-timeout=60s`、`spring.ai.retry.max-attempts=1`，模型异常转 `ModelUnavailableException` → `code=503`（区别于兜底 `found=false`），前端 `/qa/ask` 单独 90s 超时。排查手法：连续两次 `jcmd <pid> Thread.print`，栈不变且 CPU 不涨 = 阻塞在外部 IO，不是死循环。
+33. **跨语言检索的方向选择（中文问题匹配英文文档 / 中英混合语料）**：根因是向量模型 `text-embedding-v4` 的中英向量**不在同一语义空间对齐**（中文查询与英文 chunk 余弦相似度普遍偏低，坑 #22 即此表象）。曾先落地「查询翻译」（`QueryTranslator` 中文→英文再向量化），但用户提出「知识库同时有中英文档怎么办」后暴露**前提崩塌**：翻译只能对齐到单一目标语言，混合语料会反向丢掉另一语种的召回。终版改为**跨语言向量模型**（对齐向量空间）：本地 Ollama `qwen3-embedding:0.6b`（1024 维/32K，实测中英互译句 0.9578、无关中文句 0.3758），查询期零翻译，`QueryTranslator` 已删除。切换要点：①`spring.ai.openai.base-url` 必须**含 `/v1`**（Spring AI 2.0 走官方 OpenAI SDK，`http://127.0.0.1:11434/v1`）；②删掉 `embedding.options.dimensions`（Ollama 不认该参数，模型原生 1024 维）；③`api-key` 用占位 `ollama`；④容器内需 `host.docker.internal:11434` + `extra_hosts: host-gateway`；⑤**换模型必须清表重灌**（旧向量与新空间不可混用）。⚠️ 调试陷阱：PowerShell 5.1 用 `Invoke-RestMethod` 传中文 JSON 会按非 UTF-8 编码把中文压成 `?`，导致同长度中文串向量恰好相同（相似度 1.0000）——必须用 `[Text.Encoding]::UTF8.GetBytes()` 传字节；**出现「恰好 1.0000」这类完美数值先怀疑采集工具**。Ollama 模型默认落 C 盘 `~/.ollama/models`，本次 C 盘写满导致拉取失败，已用 `OLLAMA_MODELS` 迁到 `D:\ollama\models`。
+34. **`docKey` 存储不含 `.html` 扩展名**：真实爬虫（`SpringBootDocsCrawler`）入库前已 `replaceFirst("\\.html$", "")` 去掉 `.html` 与版本段，`OriginalUrlResolver` 重建时再按产品线补回 `.html`（spring-boot/framework/security/data-jpa）或原样拼接（spring-ai 无 `.html`）。**凡写 URL 重建相关测试种子，`doc_key` 必须对齐真实格式（无版本段、无 `.html`、无前导 `/`）**，否则重建出 `/qa/x.html.html` 这类双重后缀。手动导入源（`manual-official/manual-community`）与 UGC（`origin=team`）无可靠原文地址，`OriginalUrlResolver` 一律返回 `null`。
+35. **分页 total 查询不能只复用 WHERE 片段**：把 `META_SELECT + WHERE + ORDER BY` 里的 WHERE 子串直接当 count SQL 会同时犯两个错——①缺 `SELECT count(*) FROM kb_document`；②丢掉了 WHERE 里的 `?` 绑定参数（PostgreSQL 报「未设定参数值」）。正确做法：count SQL = `SELECT count(*) FROM kb_document` + WHERE 片段，并传**同一组** `args`（`KbService.docsPage` 已修复，`KbServiceTest#docsPageReturnsTotalAndSlicesByLimitOffset` 锁定）。
+36. **树高亮必须比较完整路径而非叶子 key**：产品线/版本/来源三级树中 `official`、`community`、`latest` 会在多个父节点下重名；前端只比较 `selected.source === s.key` 会让所有 `official` 同时点亮。高亮判定必须带全部上级键（product + version + source），折叠状态的 Set 键同理用 `product::version` 组合键。
 
 ## 8. 进度状态
 
@@ -144,6 +156,9 @@ curl -X POST http://localhost:8080/api/auth/register -H "Content-Type: applicati
 - ✅ **数据源扩容（2026-10-21）**：爬虫从 3 源扩到 **10 源**——新增 `springframework` 465 / `springsecurity` 156 / `springdatajpa` 35 / `vite` 39 / `vuerouter` 167 / `pinia` 97（均 official）+ `stackoverflow` 251（community，StackExchange API 高票问答）。抽 `AbstractSitemapCrawler`（sitemap 递归/限速/重试/进度）与 `AbstractSpringReferenceCrawler`（Antora 版本目录只取最新版，坑 #31）、`AbstractVitePressCrawler`；`--crawl-limit=N` 可调每源篇数，`--import=all` 自动扫描 `data/raw/*.json`。入库后 **1445 篇 / 3263 chunks / 3265 向量行**（扩容前 235/854/856），7 源导入 0 失败；验证 `password storage`（7.2-SNAPSHOT，0.7299）与 `vite dependency pre-bundling`（0.7589）均 top1 命中，`ask` 端到端 found=true。新增 7 例爬虫单测，`mvn test` 54/54 通过。详见 [docs/devlog/2026-10-21.md](./docs/devlog/2026-10-21.md)。
 - ✅ **问答超时加固（2026-10-22）**：排查「后端处理完不回显 + 前端超时」——根因为外网不可达 + Spring AI `RestClient` 无超时导致请求线程永久阻塞（坑 #32）。落地 `spring.http.client` 连接 5s / 读取 60s、`spring.ai.retry.max-attempts=1`；模型异常转 `ModelUnavailableException` → 控制器 503「模型服务暂时不可用」；前端 `/qa/ask` 单独 90s 超时。新增单测 `QaServiceTest#modelFailureMapsTo503`，`mvn test` 55/55、`npm run check` 通过。详见 [docs/devlog/2026-10-22.md](./docs/devlog/2026-10-22.md)。
 - ✅ **检索基线测评（2026-10-25）**：新建 `eval/` 包（`BaselineEvaluator` 纯函数指标 + `BaselineRunner` `--baseline` Runner + `CuratedQuery` + `resources/eval/queries.json` 25 条金标集），复用线上 `RagSearchService`/`Reranker` 同一路径实测 265 条查询（真实百炼 Embedding，seed=42 分层抽样）。基线：合成自检索 Hit@10 **0.9167**/MRR@10 **0.7414**，精选问句 Hit@10 **0.8696**/MRR@10 **0.7685**，版本过滤 leakRate **0.0000**，可答兜底率 0 / 负例正确兜底率 1.0，official 平均名次提升 +1.03。`BaselineEvaluatorTest` 8/8 通过。产出 [docs/检索基线测评报告.md](docs/检索基线测评报告.md) + `data/baseline/result-*.json`。详见 [docs/devlog/2026-10-25.md](./docs/devlog/2026-10-25.md)。
+- ✅ **双语检索 · 跨语言向量模型（2026-10-25，终版）**：Embedding 从百炼 `text-embedding-v4` 换为**本地 Ollama `qwen3-embedding:0.6b`**（1024 维 / 32K 上下文，中英共用同一语义空间）—— 中文查询直接向量化即可命中英文文档，且**中英混合语料同样覆盖**。演进：第一阶段「查询翻译」（`QueryTranslator`，仅单语料成立）因用户追问混合语料而废弃并删除该类及其测试；终版方案对比见 devlog（①查询翻译 ②跨语言模型【采用】③多路召回+RRF ④索引期双语化）。配置：`spring.ai.openai.base-url=http://127.0.0.1:11434/v1`（**必须含 `/v1`**）、`model=qwen3-embedding:0.6b`、**删除 `dimensions`**、`api-key` 占位 `ollama`；compose 内改 `host.docker.internal:11434/v1` + `extra_hosts: host-gateway`。模型目录经 `OLLAMA_MODELS=D:\ollama\models` 迁至 D 盘（C 盘已满）。换模型必须清表全量重灌：1443 文档 / 3260 chunk / 3260 向量，10 源 0 失败。验收 4 组中英文查询 Top1 全部命中（`如何配置 CDS` 0.5696、`Spring Boot 自动配置原理` 0.6745、`Vue Router 导航守卫怎么用` 0.7498）。`mvn test` **77/77** 通过。详见 [docs/devlog/2026-10-25.md](./docs/devlog/2026-10-25.md)（双语检索 · 跨语言向量模型章节）。
+- ✅ **V1.0 升级（2026-10-25，决策见 D12/D13）**：三功能落地 —— ①知识库导航页后端 `kb/KbService` + `KbController`（`GET /api/kb/overview|tree|docs|doc/:id`，product▸version▸source 三级树 + 卡片过滤 + 详情 markdown 拼接）；②来源聚合（文档级）+ 原文跳转：`OriginalUrlResolver` 纯函数重建原文 URL、`SourceRef` 加 `docId`/`originalUrl`、`QaService` 按 docId 合并同文档多 chunk；③模拟 UGC 上传 `kb/UgcService` + `UgcController`（`POST /api/ugc/documents`，真实入库 `IngestionService`，`source=ugc`→`community`/`team`）。`IngestionService` 加 ugc 映射、`SecurityConfig` 放行 `/api/kb/**`；前端接 `KbHome`/`KbDoc`/`Editor`/`SourceCard` + `types|api|utils`。测试 `OriginalUrlResolverTest` 8/8 + `KbServiceTest` 5/5 + `QaServiceTest` 7/7（新增文档聚合用例）通过（坑 #34）。详见 [docs/devlog/2026-10-25.md](./docs/devlog/2026-10-25.md)（V1.0 升级章节）。
+- ✅ **V1.1 体验补完（2026-10-25 晚，决策见 D14~D17）**：①知识库文档**分页**（`KbService.docsPage`，`PageResult` + LIMIT/OFFSET，默认 12 条/页，与全量 `docs` 共用 WHERE）+ 前端左树**两级折叠**（产品线/版本，`+ / −`）与分页条；②修复「选中 official 树节点时所有 official 同时点亮」（高亮改完整 product+version+source 路径比较，坑 #36）；③**问答历史会话持久化 + 会话管理**（`kb_conversation`/`kb_message`，`/api/me/conversations` 列表/新建/详情/重命名/删除/追加，窗口默认 10 轮裁剪 + 30 天 TTL，跨用户 404），前端 `/qa` 会话下拉切换/新建/重命名/删除，切换页面后自动恢复最近会话；④**点赞/收藏**（`kb_doc_like`/`kb_doc_favorite` 复合主键幂等，`/api/me/docs/{id}/like|favorite`，详情返回公开计数 + 当前用户状态，`KbDoc` 按钮联动，`Me` 我的收藏列表）；⑤修复 UGC 文档**未绑定作者**（`kb_document.author` 幂等 ALTER + `UgcService` 事务内回写，`/api/me/documents` 个人中心可见）。新增 `MeConversationApiTest` 4 例 + `KbServiceTest` 分页 1 例，`mvn test` **82/82** 通过、`npm run check` / `npm run build` 通过（坑 #35）。详见 [docs/devlog/2026-10-25.md](./docs/devlog/2026-10-25.md)（V1.1 体验补完章节）。
 - ⏭️ **下一步**：**C1~C8 待确认清单待用户逐条裁决**（开放注册 / 问答免登录 / 无角色区分 / 文档可见性 / 权威三档 / 来源粒度 / DTO 字段 / 管理端能力，见 [docs/用户端前端设计.md](docs/用户端前端设计.md) §9）；裁决通过后进入 V2.0 编码（KbController overview/tree/docs/doc/:id + QaService 来源聚合 SourceRefV2 + /kb 左树右卡 + 文档详情 + 问答页来源卡文档级改造），门禁：聚合单测 + mvn test 全量 + 浏览器联调。另：阈值双条件改造（绝对下限 + 相对落差）仍待执行。
 
 ## 9. 开发日志索引
@@ -154,4 +169,4 @@ curl -X POST http://localhost:8080/api/auth/register -H "Content-Type: applicati
 | 2026-10-20 | [devlog/2026-10-20.md](./docs/devlog/2026-10-20.md) | Task 1 导入链路：分块器 + 幂等入库 + 测试门禁 + 文档同步 ｜ Task 5 真实数据灌库 + 三条验证用例（$ 转义 / 爬虫字段缺口 / 百炼批量上限 3 坑） ｜ **Task 6 管理接口 + 前端联调（active 双写、URL 白名单防 SSRF、前端版本动态化、状态开关提示文案修复）** ｜ **Task 7 README 与架构图** ｜ **Task 8 Docker 一体化部署（dockerproxy 镜像源 + 8 项验收全过）** ｜ **用户端问答页 /qa（versions 端点 + 暖橘玻璃视觉 + 角标脉冲 + 问法阈值坑 #22/#23）** ｜ **v1 收尾：答案卡 Markdown 渲染 + 来源卡视觉降权（坑 #24~#26）** ｜ **v2 方向定稿（私有化单实例，ADR D9/D10）+ v2 文档重写 v2.2 + demo.html 8 视图原型** ｜ **v2 前端重建（暖橘 token + NavBar 外壳 + /admin 深色侧边栏）+ 迁移回归 11 项全过（坑 #27 回归误报）** ｜ **视觉基调 v2.1「档案馆 / 书房」（纸面 + hairline + 深墨 + 沉陶土）与用户反馈 5 修（角标换行/官方括号/序号正序/Footer 仅首页/管理员徽标，坑 #28/#29）** |
 | 2026-10-21 | [devlog/2026-10-21.md](./docs/devlog/2026-10-21.md) | **数据源扩容：3 源 → 10 源（Spring Framework/Security/Data JPA + Vite/Vue Router/Pinia + Stack Overflow API）**，235→1445 篇 / 854→3263 chunks，7 源导入 0 失败（坑 #31 sitemap 混合版本页） |
 | 2026-10-22 | [devlog/2026-10-22.md](./docs/devlog/2026-10-22.md) | **问答不回显 + 前端超时排查**：外网不可达 + RestClient 无超时挂死线程；落地出站超时、503 降级、前端 90s 超时（坑 #32） |
-| 2026-10-25 | [devlog/2026-10-25.md](./docs/devlog/2026-10-25.md) | **检索基线测评**：eval 包落地（纯函数指标 + `--baseline` Runner + 25 条金标集），实测四维指标（IR / 版本过滤 / 兜底 / 权威重排），产出一份可信基线报告 |
+| 2026-10-25 | [devlog/2026-10-25.md](./docs/devlog/2026-10-25.md) | **检索基线测评**：eval 包落地（纯函数指标 + `--baseline` Runner + 25 条金标集），实测四维指标（IR / 版本过滤 / 兜底 / 权威重排），产出一份可信基线报告 ｜ **双语检索（跨语言向量模型 · 终版）**：换本地 Ollama `qwen3-embedding:0.6b`（1024 维，中英同一语义空间，混合语料全覆盖），迁模型目录至 D 盘，清表全量重灌 3260 向量，中文查询 Top1 命中验证通过（坑 #33） ｜ **V1.0 升级**：知识库导航页后端（/api/kb/**）+ 文档级来源聚合与原文跳转（`OriginalUrlResolver`/`SourceRef`/`QaService`）+ 模拟 UGC 上传（/api/ugc/**，真实入库，坑 #34，决策 D12/D13） ｜ **V1.1 体验补完**：文档分页与左树折叠、树高亮路径修复（坑 #36）、会话持久化与会话管理（10 轮窗口 + 30 天 TTL）、点赞收藏、UGC 作者归属（决策 D14~D17，坑 #35） |

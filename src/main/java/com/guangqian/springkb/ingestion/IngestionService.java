@@ -41,7 +41,8 @@ public class IngestionService {
             Map.entry("pinia", "official"),
             Map.entry("stackoverflow", "community"),
             Map.entry("manual-official", "official"),
-            Map.entry("manual-community", "community"));
+            Map.entry("manual-community", "community"),
+            Map.entry("ugc", "community"));
 
     /** source → 来源站点域名。 */
     static final Map<String, String> SOURCE_ORIGIN = Map.ofEntries(
@@ -56,7 +57,8 @@ public class IngestionService {
             Map.entry("pinia", "pinia.vuejs.org"),
             Map.entry("stackoverflow", "stackoverflow.com"),
             Map.entry("manual-official", "manual"),
-            Map.entry("manual-community", "stackoverflow.com"));
+            Map.entry("manual-community", "stackoverflow.com"),
+            Map.entry("ugc", "team"));
 
     private static final String DEFAULT_AUTHORITY = "official";
     private static final String DEFAULT_DOC_TYPE = "reference";

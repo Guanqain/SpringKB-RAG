@@ -3,9 +3,11 @@ package com.guangqian.springkb.rag;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.guangqian.springkb.common.OriginalUrlResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -99,24 +101,35 @@ public class QaService {
     }
 
     /**
-     * 按 chunk id 批量回源 kb_chunk JOIN kb_document（§6.5）；查不到的行跳过（引用越界保护）。
-     * sources 顺序与 reranked（送模型）顺序一致，index 从 1..n。
+     * 按 chunk id 批量回源 kb_chunk JOIN kb_document（§6.5），再按文档级聚合（C6）：
+     * 同一文档的多个 chunk 合并为一条来源，[n] 角标按文档编号（保留 reranked 首次出现顺序）；
+     * 查不到的行跳过（引用越界保护）。
      */
     private List<SourceRef> resolveSources(List<Document> reranked) {
         if (reranked.isEmpty()) {
             return List.of();
         }
         Map<String, SourceRow> byId = querySourceRows(reranked.stream().map(Document::getId).toList());
-        List<SourceRef> sources = new ArrayList<>(reranked.size());
-        int index = 1;
+        Map<String, DocGroup> groups = new LinkedHashMap<>();
         for (Document doc : reranked) {
             SourceRow row = byId.get(doc.getId());
             if (row == null) {
                 continue;
             }
-            Double score = doc.getScore();
-            sources.add(new SourceRef(index++, row.authority(), row.version(), row.title(),
-                    row.section(), row.headingPath(), score == null ? 0.0d : score, truncate(row.contentMarkdown(), SNIPPET_MAX_CHARS)));
+            double score = doc.getScore() == null ? 0.0d : doc.getScore();
+            DocGroup group = groups.get(row.docId());
+            if (group == null) {
+                groups.put(row.docId(), new DocGroup(row, score));
+            } else {
+                group.absorb(row, score);
+            }
+        }
+        List<SourceRef> sources = new ArrayList<>(groups.size());
+        int index = 1;
+        for (DocGroup group : groups.values()) {
+            sources.add(new SourceRef(index++, group.authority(), group.version(), group.title(),
+                    group.section(), group.headingPath(), group.maxScore(),
+                    group.docId(), group.originalUrl(), truncate(group.combinedMarkdown(), SNIPPET_MAX_CHARS)));
         }
         return sources;
     }
@@ -124,22 +137,97 @@ public class QaService {
     private Map<String, SourceRow> querySourceRows(List<String> ids) {
         String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
         String sql = """
-                SELECT c.id, c.content_markdown, c.heading_path, d.title, d.version, d.section, d.authority
+                SELECT c.id, c.doc_id, c.content_markdown, c.heading_path,
+                       d.title, d.version, d.section, d.authority, d.product, d.origin, d.doc_key
                 FROM kb_chunk c JOIN kb_document d ON d.id = c.doc_id
                 WHERE c.id IN (%s)
                 """.formatted(placeholders);
         Map<String, SourceRow> rows = new HashMap<>();
         jdbcTemplate.query(sql, rs -> {
+            String version = rs.getString("version");
             rows.put(rs.getString("id"), new SourceRow(
                     rs.getString("id"),
+                    rs.getString("doc_id"),
                     rs.getString("content_markdown"),
                     rs.getString("heading_path"),
                     rs.getString("title"),
-                    rs.getString("version"),
+                    version,
                     rs.getString("section"),
-                    rs.getString("authority")));
+                    rs.getString("authority"),
+                    OriginalUrlResolver.resolve(
+                            rs.getString("product"), rs.getString("origin"), version, rs.getString("doc_key"))));
         }, ids.toArray());
         return rows;
+    }
+
+    /** 文档级聚合并集：同一文档多个 chunk 的 markdown 以空行拼接，score 取最高、headingPath 随最高分块。 */
+    private static final class DocGroup {
+
+        private final String docId;
+        private final String authority;
+        private final String version;
+        private final String title;
+        private final String section;
+        private final String originalUrl;
+        private double maxScore;
+        private String headingPath;
+        private final StringBuilder markdown = new StringBuilder();
+
+        DocGroup(SourceRow row, double score) {
+            this.docId = row.docId();
+            this.authority = row.authority();
+            this.version = row.version();
+            this.title = row.title();
+            this.section = row.section();
+            this.originalUrl = row.originalUrl();
+            this.maxScore = score;
+            this.headingPath = row.headingPath();
+            this.markdown.append(row.contentMarkdown());
+        }
+
+        void absorb(SourceRow row, double score) {
+            if (score > maxScore) {
+                maxScore = score;
+                headingPath = row.headingPath();
+            }
+            markdown.append("\n\n").append(row.contentMarkdown());
+        }
+
+        String combinedMarkdown() {
+            return markdown.toString();
+        }
+
+        String docId() {
+            return docId;
+        }
+
+        String authority() {
+            return authority;
+        }
+
+        String version() {
+            return version;
+        }
+
+        String title() {
+            return title;
+        }
+
+        String section() {
+            return section;
+        }
+
+        String originalUrl() {
+            return originalUrl;
+        }
+
+        double maxScore() {
+            return maxScore;
+        }
+
+        String headingPath() {
+            return headingPath;
+        }
     }
 
     private String generate(String question, String version, List<SourceRef> sources) {
@@ -187,8 +275,9 @@ public class QaService {
         return text.length() <= max ? text : text.substring(0, max) + "...";
     }
 
-    /** 回源查询行（内部值对象）。 */
-    private record SourceRow(String id, String contentMarkdown, String headingPath,
-                             String title, String version, String section, String authority) {
+    /** 回源查询行（内部值对象）；originalUrl 已按 product/origin/version/doc_key 重建，可能为 null。 */
+    private record SourceRow(String id, String docId, String contentMarkdown, String headingPath,
+                             String title, String version, String section, String authority,
+                             String originalUrl) {
     }
 }

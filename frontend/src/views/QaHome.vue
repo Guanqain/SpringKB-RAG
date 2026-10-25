@@ -1,7 +1,18 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { ask, fetchVersions } from '@/api/qa'
+import {
+  appendConversationMessage,
+  createConversation,
+  deleteConversation,
+  fetchConversation,
+  fetchConversations,
+  renameConversation,
+} from '@/api/me'
+import { useAuthStore } from '@/stores/auth'
 import type { QaHistoryEntry } from '@/types/qa'
+import type { ConversationDetail, ConversationSummary } from '@/types/me'
 import AskInput from '@/components/qa/AskInput.vue'
 import AnswerCard from '@/components/qa/AnswerCard.vue'
 import FallbackCard from '@/components/qa/FallbackCard.vue'
@@ -10,7 +21,7 @@ import SourceCard from '@/components/qa/SourceCard.vue'
 
 type ViewState = 'idle' | 'loading' | 'answered' | 'fallback' | 'error'
 
-// 示例问法选用经真实数据验证可命中（topScore ≥ 0.65 阈值）的措辞；
+// 示例问法选用经真实数据验证可命中（topScore ≥ 0.5 阈值）的措辞；
 // 中文短问法（如「createApp 是做什么的？」）相似度低于阈值会触发兜底，演示体验差
 const EXAMPLES = [
   'how to create a vue app with createApp',
@@ -18,6 +29,7 @@ const EXAMPLES = [
   'How to use ChatClient in Spring AI',
 ]
 
+const auth = useAuthStore()
 const state = ref<ViewState>('idle')
 const versions = ref<string[]>([])
 const history = ref<QaHistoryEntry[]>([])
@@ -27,6 +39,11 @@ const errorMsg = ref('')
 const highlightIdx = ref<number | null>(null)
 const askRef = ref<InstanceType<typeof AskInput>>()
 const streamRef = ref<HTMLElement>()
+
+// 已登录用户的会话（持久化在后端）；匿名用户仍用内存 history
+const conversations = ref<ConversationSummary[]>([])
+const conversationId = ref<number | null>(null)
+const conversationLoading = ref(false)
 
 let seq = 1
 let hlTimer: number | undefined
@@ -40,11 +57,120 @@ onMounted(async () => {
   } catch {
     /* 版本下拉静默降级为「全部版本」 */
   }
+  if (auth.isAuthenticated) {
+    try {
+      await loadConversationList()
+      if (conversations.value.length) {
+        await selectConversation(conversations.value[0].id)
+      }
+    } catch {
+      /* 会话加载失败不影响问答本身 */
+    }
+  }
 })
 
 onBeforeUnmount(() => {
   if (hlTimer) window.clearTimeout(hlTimer)
 })
+
+function toEntries(detail: ConversationDetail): QaHistoryEntry[] {
+  return detail.messages.map((m) => ({
+    id: m.id,
+    question: m.question,
+    version: m.version ?? undefined,
+    result: { found: m.found, answer: m.answer, sources: m.sources },
+    at: Date.parse(m.createdAt.replace(' ', 'T')) || Date.now(),
+  }))
+}
+
+/** 用后端返回的会话详情覆盖当前视图（消息已按窗口裁剪） */
+function applyDetail(detail: ConversationDetail) {
+  conversationId.value = detail.id
+  history.value = toEntries(detail)
+  const last = history.value[history.value.length - 1]
+  if (last) {
+    currentId.value = last.id
+    state.value = last.result.found ? 'answered' : 'fallback'
+    lastAttempt.value = { question: last.question, version: last.version }
+  } else {
+    currentId.value = null
+    state.value = 'idle'
+    lastAttempt.value = null
+  }
+}
+
+async function loadConversationList() {
+  conversations.value = await fetchConversations()
+}
+
+async function selectConversation(id: number) {
+  conversationLoading.value = true
+  try {
+    applyDetail(await fetchConversation(id))
+  } catch {
+    /* 404（已被清理）/网络错误：回到列表刷新状态 */
+    await loadConversationList()
+  } finally {
+    conversationLoading.value = false
+  }
+}
+
+function onConversationChange(event: Event) {
+  const raw = (event.target as HTMLSelectElement).value
+  if (!raw) {
+    startNewConversation()
+    return
+  }
+  void selectConversation(Number(raw))
+}
+
+/** 新建会话：先清空视图，首次提问后再落库，避免产生空会话 */
+function startNewConversation() {
+  conversationId.value = null
+  history.value = []
+  currentId.value = null
+  state.value = 'idle'
+  errorMsg.value = ''
+  lastAttempt.value = null
+  nextTick(() => askRef.value?.focus())
+}
+
+async function renameCurrent() {
+  if (conversationId.value === null) return
+  const currentTitle = conversations.value.find((c) => c.id === conversationId.value)?.title ?? '会话'
+  try {
+    const { value } = await ElMessageBox.prompt('输入新的会话名称', '重命名会话', {
+      inputValue: currentTitle,
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      inputValidator: (v) => (v && v.trim() ? true : '名称不能为空'),
+    })
+    await renameConversation(conversationId.value, value.trim())
+    await loadConversationList()
+  } catch {
+    /* 用户取消 */
+  }
+}
+
+async function removeCurrent() {
+  if (conversationId.value === null) return
+  try {
+    await ElMessageBox.confirm('删除后该会话的问答记录将不可恢复', '删除会话', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+    await deleteConversation(conversationId.value)
+    await loadConversationList()
+    if (conversations.value.length) {
+      await selectConversation(conversations.value[0].id)
+    } else {
+      startNewConversation()
+    }
+  } catch {
+    /* 用户取消 */
+  }
+}
 
 async function submit(question: string, version?: string) {
   if (state.value === 'loading') return
@@ -53,6 +179,26 @@ async function submit(question: string, version?: string) {
   errorMsg.value = ''
   try {
     const result = await ask(question, version)
+    if (auth.isAuthenticated) {
+      try {
+        let id = conversationId.value
+        if (id === null) {
+          const created = await createConversation(question.slice(0, 60))
+          id = created.id
+        }
+        applyDetail(await appendConversationMessage(id, {
+          question,
+          answer: result.answer,
+          found: result.found,
+          version,
+          sources: result.sources,
+        }))
+        await loadConversationList()
+        return
+      } catch {
+        /* 持久化失败不阻断本次回答展示，退回本地渲染 */
+      }
+    }
     const entry: QaHistoryEntry = { id: seq++, question, version, result, at: Date.now() }
     history.value.push(entry)
     currentId.value = entry.id
@@ -107,6 +253,21 @@ function pickVersion() {
         <h1 class="title">智能问答</h1>
         <p class="sub">自然语言提问，精准引用溯源</p>
       </header>
+
+      <!-- 会话管理：登录用户可切换 / 新建 / 重命名 / 删除，历史来自后端持久化 -->
+      <div v-if="auth.isAuthenticated" class="conv">
+        <select class="conv__select" :value="conversationId ?? ''" aria-label="切换会话" @change="onConversationChange">
+          <option value="">新会话（未保存）</option>
+          <option v-for="c in conversations" :key="c.id" :value="c.id">
+            {{ c.title }}（{{ c.messageCount }}）
+          </option>
+        </select>
+        <button class="chip" type="button" @click="startNewConversation">新建</button>
+        <button class="chip" type="button" :disabled="conversationId === null" @click="renameCurrent">重命名</button>
+        <button class="chip" type="button" :disabled="conversationId === null" @click="removeCurrent">删除</button>
+        <span v-if="conversationLoading" class="conv__hint">正在载入会话...</span>
+      </div>
+      <p v-else class="conv__hint">登录后会自动保存会话历史，切换页面也不会丢失</p>
 
       <HistoryList v-if="history.length" :entries="history" :active-id="currentId" @select="showEntry" />
 
@@ -230,6 +391,41 @@ function pickVersion() {
   margin-top: var(--sp-1);
   font-size: var(--fs-sm);
   color: var(--ink-500);
+}
+
+/* ===== 会话管理条 ===== */
+.conv {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.conv__select {
+  min-width: 0;
+  max-width: 360px;
+  padding: 6px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  font-size: var(--fs-sm);
+  font-family: inherit;
+  color: var(--ink-700);
+}
+
+.conv__select:focus {
+  outline: none;
+  box-shadow: var(--ring);
+}
+
+.conv .chip[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.conv__hint {
+  font-size: var(--fs-xs);
+  color: var(--ink-400);
 }
 
 .stream {

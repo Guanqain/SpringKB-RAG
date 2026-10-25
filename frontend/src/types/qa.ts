@@ -9,6 +9,10 @@ export interface SourceRef {
   section: string
   headingPath: string
   score: number
+  /** 文档级聚合后的文档主键 */
+  docId: string
+  /** 原文外链；无法可靠重建时为 null（前端据此隐藏「打开原文」） */
+  originalUrl: string | null
   /** 原文片段（后端已截断 ≤800 字符） */
   snippet: string
 }

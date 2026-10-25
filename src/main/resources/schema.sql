@@ -49,3 +49,54 @@ CREATE TABLE IF NOT EXISTS kb_chunk (
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT uk_kb_chunk_doc_ordinal UNIQUE (doc_id, ordinal)
 );
+
+-- ---------------- 文档作者（UGC 归属）----------------
+-- 历史表结构没有 author 列，幂等 ALTER 补齐；爬虫/管理端导入的文档保持 NULL。
+ALTER TABLE kb_document ADD COLUMN IF NOT EXISTS author TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_kb_document_author ON kb_document (author, updated_at DESC)
+    WHERE author IS NOT NULL;
+
+-- ---------------- kb_conversation：用户会话（问答历史）----------------
+-- 会话按登录用户名隔离；ttl 清理由 ConversationService 在读写时顺带执行（30 天无新消息即删）。
+CREATE TABLE IF NOT EXISTS kb_conversation (
+    id         BIGSERIAL   PRIMARY KEY,
+    username   TEXT        NOT NULL,
+    title      TEXT        NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_kb_conversation_user ON kb_conversation (username, updated_at DESC);
+
+-- ---------------- kb_message：会话内问答消息 ----------------
+-- 每行 = 一轮问答（question + answer + sources JSONB）；超过窗口大小的旧行由服务层裁剪。
+CREATE TABLE IF NOT EXISTS kb_message (
+    id              BIGSERIAL   PRIMARY KEY,
+    conversation_id BIGINT      NOT NULL REFERENCES kb_conversation (id) ON DELETE CASCADE,
+    question        TEXT        NOT NULL,
+    answer          TEXT        NOT NULL,
+    found           BOOLEAN     NOT NULL DEFAULT true,
+    version         TEXT,
+    sources         JSONB       NOT NULL DEFAULT '[]',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_kb_message_conversation ON kb_message (conversation_id, id);
+
+-- ---------------- 文档点赞 / 收藏（登录用户级，计数公开）----------------
+CREATE TABLE IF NOT EXISTS kb_doc_like (
+    doc_id     TEXT        NOT NULL REFERENCES kb_document (id) ON DELETE CASCADE,
+    username   TEXT        NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (doc_id, username)
+);
+
+CREATE TABLE IF NOT EXISTS kb_doc_favorite (
+    doc_id     TEXT        NOT NULL REFERENCES kb_document (id) ON DELETE CASCADE,
+    username   TEXT        NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (doc_id, username)
+);
+
+CREATE INDEX IF NOT EXISTS idx_kb_doc_favorite_user ON kb_doc_favorite (username, created_at DESC);

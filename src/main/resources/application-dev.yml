@@ -10,5 +10,5 @@ spring:
     deepseek:
       api-key: ${DEEPSEEK_API_KEY:}
     openai:
-      # 百炼 OpenAI 兼容模式；与系统环境变量名对齐（你当前设置的是 DASHSCOPE_API_KEY）
-      api-key: ${DASHSCOPE_API_KEY:}
+      # 本地 Ollama 不校验 key，占位即可（官方 OpenAI SDK 要求非空）
+      api-key: ${OLLAMA_API_KEY:ollama}

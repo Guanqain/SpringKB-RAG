@@ -15,7 +15,7 @@ spring:
       api-key: ${DEEPSEEK_API_KEY:test-only-local-key-not-used}
     openai:
       # Embedding 已被 @MockitoBean 替换，此 key 不触发任何真实调用
-      api-key: ${DASHSCOPE_API_KEY:test-only-local-key-not-used}
+      api-key: ${OLLAMA_API_KEY:test-only-local-key-not-used}
     vectorstore:
       pgvector:
         dimensions: 1024

@@ -67,7 +67,9 @@ public class RagTraceService {
         int initialTopK = Math.max(1, k * 3);
         List<Map<String, Object>> stages = new ArrayList<>();
 
-        log.info("[{}] 开始检索诊断 query={} version={} topK={} initialTopK={}", traceId, query, version, k, initialTopK);
+        // 查询直接向量化（跨语言模型：中英共用同一语义空间，无需翻译）
+        log.info("[{}] 开始检索诊断 query={} version={} topK={} initialTopK={}",
+                traceId, query, version, k, initialTopK);
 
         // ① 问题向量化
         long t0 = System.nanoTime();
