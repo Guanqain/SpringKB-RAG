@@ -216,8 +216,8 @@ onMounted(() => {
         </nav>
 
         <div v-if="!loading && tree.length === 0" class="kb-tree__empty">
-          <p class="empty__text">知识还是一片空白 —— 从导入一批文档开始</p>
-          <router-link class="btn btn--primary" to="/admin/import">去导入</router-link>
+          <p class="empty__text">知识还是一片空白 —— 从写第一篇文档开始</p>
+          <router-link class="btn btn--primary" to="/editor">去写文档</router-link>
         </div>
       </aside>
 
@@ -237,6 +237,7 @@ onMounted(() => {
               >
                 {{ card.authority === 'official' ? '官方' : '社区' }}
               </span>
+              <span v-if="card.visibility === 'private'" class="badge badge--private">私有</span>
               <span v-if="card.version" class="doc-card__ver num">{{ card.version }}</span>
             </div>
             <h3 class="doc-card__title">{{ card.title }}</h3>

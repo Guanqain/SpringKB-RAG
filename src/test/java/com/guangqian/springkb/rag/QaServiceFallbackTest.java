@@ -146,16 +146,18 @@ class QaServiceFallbackTest {
         vectorStore.add(List.of(Document.builder()
                 .id(chunkId)
                 .text(text)
-                .metadata(Map.of(
-                        "doc_id", docId,
-                        "product", "spring-boot",
-                        "origin", "spring.io",
-                        "authority", authority,
-                        "version", version,
-                        "active", "true",
-                        "doc_type", "reference",
-                        "language", "en",
-                        "title", title))
+                .metadata(Map.ofEntries(
+                        Map.entry("doc_id", docId),
+                        Map.entry("product", "spring-boot"),
+                        Map.entry("origin", "spring.io"),
+                        Map.entry("authority", authority),
+                        Map.entry("version", version),
+                        Map.entry("active", "true"),
+                        Map.entry("visibility", "team"),
+                        Map.entry("review_status", "approved"),
+                        Map.entry("doc_type", "reference"),
+                        Map.entry("language", "en"),
+                        Map.entry("title", title)))
                 .build()));
         jdbcTemplate.update("""
                 INSERT INTO kb_document

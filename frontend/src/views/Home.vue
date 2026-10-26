@@ -1,38 +1,30 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useDocumentStore } from '@/stores/document'
+import { fetchKbOverview } from '@/api/kb'
+import type { KbOverview } from '@/types/kb'
 
 // 首页（外壳）：Hero + 统计条 + 产品线卡 + 功能区。
-// 数据口径：统计条复用现有 GET /api/admin/documents 聚合（总文档数 / chunk 总数），
-// 不可真实获得的指标（引用命中率）一律占位「—」，产品线文档数不得伪造 → 结构展示 + 占位。
-// 产品线覆盖数为结构性常量（首页结构固定覆盖 Spring Boot / Spring AI / Vue 三条产品线）。
+// 数据口径：统计条改用公开的 GET /api/kb/overview（普通成员也可访问，
+// 不再依赖仅 ADMIN 可用的 /api/admin/documents）。
 
 const router = useRouter()
-const store = useDocumentStore()
 
-// 注入 onMounted 的聚合状态：loading 中 / 失败 / 成功
-const loaded = ref(false)
+const overview = ref<KbOverview | null>(null)
 const failed = ref(false)
 
 onMounted(async () => {
   try {
-    await store.fetchDocuments()
-    loaded.value = true
+    overview.value = await fetchKbOverview()
   } catch {
     // 请求失败 → 统计条显示占位空态，不崩溃
     failed.value = true
   }
 })
 
-const totalDocs = computed(() => store.documents.length)
-const totalChunks = computed(() =>
-  store.documents.reduce((sum, d) => sum + d.chunkCount, 0),
-)
-
 /** 真实数值仅在聚合成功后渲染，其余一律占位「—」 */
-function realValue(fn: () => number): string {
-  return loaded.value ? String(fn()) : '—'
+function realValue(fn: (data: KbOverview) => number): string {
+  return overview.value ? String(fn(overview.value)) : '—'
 }
 
 interface StatItem {
@@ -45,21 +37,21 @@ interface StatItem {
 const stats = computed<StatItem[]>(() => {
   const aggHint = failed.value
     ? '聚合接口不可用'
-    : loaded.value
+    : overview.value
       ? '来自知识库聚合'
       : '加载中…'
   return [
-    { value: realValue(() => totalDocs.value), label: '文档总数', hint: aggHint, live: loaded.value },
-    { value: realValue(() => totalChunks.value), label: '知识片段', hint: aggHint, live: loaded.value },
-    { value: '3', label: '覆盖产品线', hint: 'Spring / Vue 全家桶', live: true },
-    { value: '—', label: '引用命中率', hint: '暂无统计口径', live: false },
+    { value: realValue((d) => d.documentCount), label: '文档总数', hint: aggHint, live: Boolean(overview.value) },
+    { value: realValue((d) => d.productCount), label: '技术分类', hint: '可自定义扩充', live: Boolean(overview.value) },
+    { value: realValue((d) => d.versionCount), label: '覆盖版本', hint: '由文档版本聚合', live: Boolean(overview.value) },
+    { value: realValue((d) => d.sourceCount), label: '来源渠道', hint: '官方 / 社区 / 上传', live: Boolean(overview.value) },
   ]
 })
 
 const badgeText = computed(() => {
   if (failed.value) return '知识库聚合暂不可用'
-  if (!loaded.value) return '知识库数据加载中…'
-  return `${totalDocs.value} 篇文档已收录`
+  if (!overview.value) return '知识库数据加载中…'
+  return `${overview.value.documentCount} 篇文档 · ${overview.value.productCount} 个技术分类`
 })
 
 // 示例问法沿用问答页既有英文问法（经真实数据验证可命中）

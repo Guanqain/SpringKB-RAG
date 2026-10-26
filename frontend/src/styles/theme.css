@@ -238,6 +238,11 @@ textarea {
   color: #b45309;
 }
 
+.badge--rejected {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
 .badge--private {
   background: var(--ink-100);
   color: var(--ink-500);

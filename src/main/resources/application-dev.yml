@@ -12,3 +12,10 @@ spring:
     openai:
       # 本地 Ollama 不校验 key，占位即可（官方 OpenAI SDK 要求非空）
       api-key: ${OLLAMA_API_KEY:ollama}
+
+# 本地开发默认回显 devCode（方便不配 SMTP 也能跑通注册/登录）；
+# 想验证「真实收信」时用 APP_AUTH_CODE_ECHO=false 启动，接口就不回显验证码。
+# 发信需要：MAIL_ENABLED=true + MAIL_HOST + MAIL_USERNAME + MAIL_PASSWORD（邮箱授权码）
+app:
+  auth:
+    code-echo: ${APP_AUTH_CODE_ECHO:true}

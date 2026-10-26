@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -59,6 +60,9 @@ class MeConversationApiTest {
 
     @Autowired
     JsonMapper jsonMapper;
+
+    @Autowired
+    PasswordEncoder passwordEncoder;
 
     @MockitoBean
     EmbeddingModel embeddingModel;
@@ -271,11 +275,16 @@ class MeConversationApiTest {
         return id;
     }
 
+    /** 普通成员账号：直接入库 MEMBER 再密码登录（注册需邮箱验证码，本类只关心用户侧能力）。 */
     private String registerAndLogin() throws Exception {
         String username = "user" + uid();
-        String body = json(Map.of("username", username, "password", "123456"));
-        MvcResult r = mockMvc.perform(post("/api/auth/register")
-                        .contentType(APPLICATION_JSON).content(body))
+        jdbcTemplate.update("""
+                INSERT INTO kb_user (username, email, password_hash, role)
+                VALUES (?, ?, ?, 'MEMBER')
+                """, username, username + "@test.local", passwordEncoder.encode("123456"));
+        MvcResult r = mockMvc.perform(post("/api/auth/login")
+                        .contentType(APPLICATION_JSON)
+                        .content(json(Map.of("username", username, "password", "123456"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andReturn();

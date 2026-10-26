@@ -35,6 +35,24 @@ export interface InteractionResult {
   favorited: boolean
 }
 
+/** GET /api/me/notifications 站内通知项 */
+export interface NotificationItem {
+  id: number
+  /** review_approved 审核通过 / review_rejected 审核驳回 */
+  kind: string
+  title: string
+  body: string | null
+  docId: string | null
+  read: boolean
+  createdAt: string
+}
+
+/** 通知列表 + 未读数 */
+export interface NotificationList {
+  items: NotificationItem[]
+  unread: number
+}
+
 /** POST /api/me/conversations/{id}/messages 请求体 */
 export interface AppendMessagePayload {
   question: string

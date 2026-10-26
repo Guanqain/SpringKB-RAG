@@ -11,6 +11,7 @@ const formRef = ref<FormInstance>()
 
 const form = reactive<ImportRequest>({
   source: 'official',
+  product: '',
   version: '3.3',
   title: '',
   docKey: '',
@@ -115,6 +116,12 @@ function resetForm() {
               <el-radio-button value="official">官方文档</el-radio-button>
               <el-radio-button value="community">社区问答</el-radio-button>
             </el-radio-group>
+          </el-form-item>
+          <el-form-item label="技术分类" prop="product">
+            <el-input
+              v-model="form.product"
+              placeholder="可自定义，如 Spring / Vue / MySQL；留空归入未分类"
+            />
           </el-form-item>
           <el-form-item label="版本" prop="version">
             <el-input

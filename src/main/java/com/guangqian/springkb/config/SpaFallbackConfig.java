@@ -6,7 +6,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
  * 前端 SPA history 路由回退（容器一体化部署模式）：
- * 直接刷新 /login、/documents、/documents/import 等页面路由时，
+ * 直接刷新 /login、/setup、/qa、/kb/doc/xxx、/admin/documents 等页面路由时，
  * Spring MVC 无对应静态资源，回退转发到 index.html 由前端路由接管。
  * 仅匹配前端页面路径，不影响 /api/** 接口。
  */
@@ -17,6 +17,14 @@ public class SpaFallbackConfig implements WebMvcConfigurer {
     public void addViewControllers(ViewControllerRegistry registry) {
         registry.addViewController("/").setViewName("forward:/index.html");
         registry.addViewController("/login").setViewName("forward:/index.html");
+        registry.addViewController("/setup").setViewName("forward:/index.html");
+        registry.addViewController("/qa").setViewName("forward:/index.html");
+        registry.addViewController("/kb").setViewName("forward:/index.html");
+        registry.addViewController("/kb/**").setViewName("forward:/index.html");
+        registry.addViewController("/me").setViewName("forward:/index.html");
+        registry.addViewController("/editor").setViewName("forward:/index.html");
+        registry.addViewController("/admin").setViewName("forward:/index.html");
+        registry.addViewController("/admin/**").setViewName("forward:/index.html");
         registry.addViewController("/documents/**").setViewName("forward:/index.html");
     }
 }

@@ -23,7 +23,11 @@ instance.interceptors.response.use(
     if (body && typeof body === 'object' && 'code' in body) {
       if (body.code !== 0) {
         ElMessage.error(body.message || '请求失败')
-        return Promise.reject(new Error(body.message))
+        // 保留业务码与 data：401 需要特殊处理，422 脱敏命中项需要渲染明细
+        const err = new Error(body.message) as Error & { code?: number; data?: unknown }
+        err.code = body.code
+        err.data = body.data
+        return Promise.reject(err)
       }
       // 拆包：响应体只保留 data 字段
       resp.data = body.data
@@ -38,6 +42,9 @@ instance.interceptors.response.use(
       if (!window.location.pathname.startsWith('/login')) {
         window.location.href = '/login'
       }
+    } else if (err.response?.status === 403) {
+      // 已登录但权限不足：只提示，不跳登录页
+      ElMessage.error(err.response?.data?.message || '无权限访问该功能')
     } else {
       const msg =
         err.response?.data?.message || err.message || '网络错误，请稍后重试'
@@ -58,6 +65,8 @@ const http = {
     request<T>({ ...config, method: 'get', url }),
   post: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
     request<T>({ ...config, method: 'post', url, data }),
+  put: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
+    request<T>({ ...config, method: 'put', url, data }),
   patch: <T>(url: string, data?: unknown, config?: AxiosRequestConfig) =>
     request<T>({ ...config, method: 'patch', url, data }),
   delete: <T>(url: string, config?: AxiosRequestConfig) =>

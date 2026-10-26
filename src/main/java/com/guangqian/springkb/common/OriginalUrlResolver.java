@@ -30,8 +30,32 @@ public final class OriginalUrlResolver {
             case "pinia.vuejs.org" -> "https://pinia.vuejs.org/" + key;
             // stackoverflow 爬虫 docKey 恒为 questions/{id}；manual-community 的自定义 docKey 无法重建 → null
             case "stackoverflow.com" -> key.startsWith("questions/") ? "https://stackoverflow.com/" + key : null;
+            case "go.dev" -> "https://go.dev/" + key;
+            case "docs.python.org" ->
+                    "https://docs.python.org/zh-cn/" + pathVersion(version, "3") + "/" + key + ".html";
+            case "fastapi.tiangolo.com" -> "https://fastapi.tiangolo.com/zh/" + key + "/";
+            case "docs.djangoproject.com" ->
+                    "https://docs.djangoproject.com/zh-hans/" + pathVersion(version, "5.2") + "/" + key + "/";
+            case "docs.docker.com" -> "https://docs.docker.com/" + key + "/";
+            case "kubernetes.io" -> "https://kubernetes.io/zh-cn/docs/" + key + "/";
+            case "postgresql.org" ->
+                    "https://www.postgresql.org/docs/" + pathVersion(version, "current") + "/" + key + ".html";
+            case "dev.mysql.com" ->
+                    "https://dev.mysql.com/doc/refman/" + pathVersion(version, "8.4") + "/en/" + key + ".html";
+            case "kafka.apache.org" ->
+                    "https://kafka.apache.org/" + pathVersion(version, "43") + "/" + key + "/";
+            case "docs.langchain.com" -> "https://docs.langchain.com/oss/python/" + key;
+            case "nodejs.org" -> "https://nodejs.org/api/" + key + ".html";
+            case "typescriptlang.org" -> "https://www.typescriptlang.org/zh/docs/" + key + ".html";
+            case "zh-hans.react.dev" -> "https://zh-hans.react.dev/" + key;
+            case "doc.rust-lang.org" -> "https://doc.rust-lang.org/book/" + key + ".html";
             default -> null;
         };
+    }
+
+    /** 版本号为空或 latest 时回落到该站点的默认版本段。 */
+    private static String pathVersion(String version, String fallback) {
+        return (version == null || version.isBlank() || "latest".equals(version)) ? fallback : version;
     }
 
     /** docs.spring.io 各产品线 URL 规则（依据对应 crawler 的 BASE 与 docKey 提取规则）。 */

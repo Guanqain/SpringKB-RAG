@@ -5,10 +5,28 @@ const props = defineProps<{
   source: SourceRef
   highlight: boolean
 }>()
+
+const emit = defineEmits<{
+  open: [source: SourceRef]
+}>()
+
+function open() {
+  emit('open', props.source)
+}
 </script>
 
 <template>
-  <div class="src" :class="{ hl: props.highlight }">
+  <div
+    class="src"
+    :class="{ hl: props.highlight }"
+    role="button"
+    tabindex="0"
+    :aria-label="`展开引用详情：${props.source.title}`"
+    :title="'点击展开引用详情'"
+    @click="open"
+    @keydown.enter.prevent="open"
+    @keydown.space.prevent="open"
+  >
     <div class="src__head">
       <span class="badge" :class="props.source.source === 'official' ? 'badge--official' : 'badge--community'">
         {{ props.source.source === 'official' ? '官方' : '社区' }}
@@ -28,6 +46,7 @@ const props = defineProps<{
       :href="props.source.originalUrl"
       target="_blank"
       rel="noopener noreferrer"
+      @click.stop
     >打开原文</a>
     <span v-else class="src__open src__open--disabled" title="原文链接不可用">打开原文</span>
   </div>
@@ -44,6 +63,21 @@ const props = defineProps<{
   border-radius: var(--r-lg);
   background: var(--surface);
   padding: var(--sp-4);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+
+.src:hover,
+.src:focus-visible {
+  border-color: var(--ink-300);
+  background: var(--surface-sunken);
+}
+
+.src:focus-visible {
+  outline: 1px solid var(--brand-600);
+  outline-offset: 2px;
 }
 
 /* 引用定位：一次性陶土脉冲环（--brand-400 → --brand-600），单次高光，不循环 */

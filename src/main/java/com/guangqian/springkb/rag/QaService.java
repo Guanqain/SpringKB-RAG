@@ -29,6 +29,10 @@ import org.springframework.stereotype.Service;
  * <p>兜底（§6.4）：初检为空或最高相似度低于 {@code app.rag.similarity-threshold}（默认 0.65）
  * 时返回 found=false 与「知识库中未找到相关答案」，绝不调用 Chat 模型。</p>
  *
+ * <p>引用相关性：只有聚合后 maxScore ≥ 同一阈值的来源才会进入 sources 与 prompt，
+ * 避免「第 1 条勉强过阈值、其余弱相关 chunk 全部展示」。若模型自身判定无法回答
+ * （输出包含 {@link #NO_ANSWER}），同样返回 found=false 且 sources 为空，不展示无意义引用。</p>
+ *
  * <p>引用溯源（§6.5）：sources 顺序与送模型的引用编号一一对应；回源按 chunk id 批量查询，
  * 查不到的行跳过（引用越界保护）；越界引用由 prompt 约束 + sources 权威列表兜住，不做字符串后处理。</p>
  */
@@ -57,12 +61,12 @@ public class QaService {
     }
 
     /**
-     * 用户端版本下拉元数据（公开接口只读查询）：active 文档的去重版本列表，升序。
-     * 无用户输入参与拼接，无注入面。
+     * 用户端版本下拉元数据（公开接口只读查询）：team 可见 + active 文档的去重版本列表，升序。
+     * 只统计 team 可见文档，避免 private 文档的存在性通过版本列表泄漏。
      */
     public List<String> listActiveVersions() {
         return jdbcTemplate.queryForList(
-                "SELECT DISTINCT version FROM kb_document WHERE active = true ORDER BY version",
+                "SELECT DISTINCT version FROM kb_document WHERE active = true AND visibility = 'team' ORDER BY version",
                 String.class);
     }
 
@@ -82,15 +86,20 @@ public class QaService {
         }
 
         List<Document> reranked = ragSearchService.rerankAndTop(candidates, k);
-        List<SourceRef> sources = resolveSources(reranked);
-        log.info("重排回源：重排后={} 条，回源成功={} 条，准备调用模型", reranked.size(), sources.size());
+        List<SourceRef> sources = resolveSources(reranked, similarityThreshold);
+        log.info("重排回源：重排后={} 条，回源且达标={} 条，准备调用模型", reranked.size(), sources.size());
         if (sources.isEmpty()) {
-            // 回源全部失败（理论不出现，kb_chunk 与 vector_store 同事务写入）；按兜底处理
-            log.warn("回源失败：初检命中但 kb_chunk/kb_document 无对应行，按兜底处理 question={}", question);
+            // 回源全部失败，或重排后没有任何来源达到阈值（仅第 1 条勉强过线）；按兜底处理
+            log.info("来源不达标：初检命中但无来源相似度 ≥ 阈值 {}，按兜底处理 question={}", similarityThreshold, question);
             return new QaResult(false, NO_ANSWER, List.of());
         }
 
         String answer = generate(question, version, sources);
+        if (answer == null || answer.contains(NO_ANSWER)) {
+            // 模型依据【检索内容】判定无法回答（含内容与问题无关）：不展示无意义引用
+            log.info("模型判定无法回答：question={} version={}", question, version);
+            return new QaResult(false, NO_ANSWER, List.of());
+        }
         return new QaResult(true, answer, sources);
     }
 
@@ -103,9 +112,10 @@ public class QaService {
     /**
      * 按 chunk id 批量回源 kb_chunk JOIN kb_document（§6.5），再按文档级聚合（C6）：
      * 同一文档的多个 chunk 合并为一条来源，[n] 角标按文档编号（保留 reranked 首次出现顺序）；
-     * 查不到的行跳过（引用越界保护）。
+     * 查不到的行跳过（引用越界保护）；聚合后 maxScore 低于 {@code minScore} 的文档不计入来源，
+     * 避免弱相关 chunk 也变成引用。
      */
-    private List<SourceRef> resolveSources(List<Document> reranked) {
+    private List<SourceRef> resolveSources(List<Document> reranked, double minScore) {
         if (reranked.isEmpty()) {
             return List.of();
         }
@@ -127,6 +137,9 @@ public class QaService {
         List<SourceRef> sources = new ArrayList<>(groups.size());
         int index = 1;
         for (DocGroup group : groups.values()) {
+            if (group.maxScore() < minScore) {
+                continue;
+            }
             sources.add(new SourceRef(index++, group.authority(), group.version(), group.title(),
                     group.section(), group.headingPath(), group.maxScore(),
                     group.docId(), group.originalUrl(), truncate(group.combinedMarkdown(), SNIPPET_MAX_CHARS)));
@@ -140,7 +153,7 @@ public class QaService {
                 SELECT c.id, c.doc_id, c.content_markdown, c.heading_path,
                        d.title, d.version, d.section, d.authority, d.product, d.origin, d.doc_key
                 FROM kb_chunk c JOIN kb_document d ON d.id = c.doc_id
-                WHERE c.id IN (%s)
+                WHERE c.id IN (%s) AND d.visibility = 'team'
                 """.formatted(placeholders);
         Map<String, SourceRow> rows = new HashMap<>();
         jdbcTemplate.query(sql, rs -> {
@@ -249,7 +262,8 @@ public class QaService {
         sys.append("2. 每个关键结论后标注引用编号 [1]..[").append(sources.size())
                 .append("]，编号必须来自下方给定的内容编号，禁止使用越界编号；\n");
         sys.append("3. 引用时标明来源类型：（官方）或（社区），取自检索内容中每条标注的权威性；\n");
-        sys.append("4. 如果【检索内容】不足以回答用户问题，明确回答\"知识库中未找到相关答案\"；\n");
+        sys.append("4. 如果【检索内容】不足以回答用户问题（包括检索内容与问题主题无关、仅字面相似），"
+                + "只回答\"知识库中未找到相关答案\"，不要引用任何内容；\n");
         if (version == null || version.isBlank()) {
             sys.append("5. 未指定版本：若检索内容中存在版本差异，请在回答中说明版本差异。");
         } else {

@@ -11,13 +11,14 @@ import {
   renameConversation,
 } from '@/api/me'
 import { useAuthStore } from '@/stores/auth'
-import type { QaHistoryEntry } from '@/types/qa'
+import type { QaHistoryEntry, SourceRef } from '@/types/qa'
 import type { ConversationDetail, ConversationSummary } from '@/types/me'
 import AskInput from '@/components/qa/AskInput.vue'
 import AnswerCard from '@/components/qa/AnswerCard.vue'
 import FallbackCard from '@/components/qa/FallbackCard.vue'
 import HistoryList from '@/components/qa/HistoryList.vue'
 import SourceCard from '@/components/qa/SourceCard.vue'
+import SourceOverlay from '@/components/qa/SourceOverlay.vue'
 
 type ViewState = 'idle' | 'loading' | 'answered' | 'fallback' | 'error'
 
@@ -39,6 +40,9 @@ const errorMsg = ref('')
 const highlightIdx = ref<number | null>(null)
 const askRef = ref<InstanceType<typeof AskInput>>()
 const streamRef = ref<HTMLElement>()
+
+/** 点击来源卡展开的悬浮引用详情 */
+const activeSource = ref<SourceRef | null>(null)
 
 // 已登录用户的会话（持久化在后端）；匿名用户仍用内存 history
 const conversations = ref<ConversationSummary[]>([])
@@ -174,6 +178,7 @@ async function removeCurrent() {
 
 async function submit(question: string, version?: string) {
   if (state.value === 'loading') return
+  activeSource.value = null
   lastAttempt.value = { question, version }
   state.value = 'loading'
   errorMsg.value = ''
@@ -216,8 +221,14 @@ function retry() {
 function showEntry(id: number) {
   const entry = history.value.find((e) => e.id === id)
   if (!entry) return
+  activeSource.value = null
   currentId.value = id
   state.value = entry.result.found ? 'answered' : 'fallback'
+}
+
+/** 点击来源卡：展开可拖动 / 可缩放的悬浮引用详情 */
+function openSource(source: SourceRef) {
+  activeSource.value = source
 }
 
 /** 引用角标点击：滚动到对应来源卡并触发一次陶土色脉冲高亮 */
@@ -329,6 +340,7 @@ function pickVersion() {
                     :data-source="s.index"
                     :source="s"
                     :highlight="highlightIdx === s.index"
+                    @open="openSource"
                   />
                 </div>
               </section>
@@ -351,6 +363,8 @@ function pickVersion() {
       <div class="composer">
         <AskInput ref="askRef" :versions="versions" :loading="state === 'loading'" @submit="submit" />
       </div>
+
+      <SourceOverlay :source="activeSource" @close="activeSource = null" />
     </div>
   </div>
 </template>

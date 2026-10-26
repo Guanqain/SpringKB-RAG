@@ -7,6 +7,8 @@ const route = useRoute()
 const items = [
   { label: '概览', to: '/admin', exact: true },
   { label: '文档管理', to: '/admin/documents' },
+  { label: '内容审核', to: '/admin/moderation' },
+  { label: '脱敏规则', to: '/admin/scan-rules' },
   { label: '数据导入', to: '/admin/import' },
   { label: '成员管理', to: '/admin/members' },
   { label: '问答统计', to: '/admin/qa-stats' },

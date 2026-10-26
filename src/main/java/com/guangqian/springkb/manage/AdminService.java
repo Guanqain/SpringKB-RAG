@@ -19,12 +19,23 @@ import com.guangqian.springkb.crawler.HtmlToMarkdown;
 import com.guangqian.springkb.crawler.ImageRef;
 import com.guangqian.springkb.crawler.RawDocument;
 import com.guangqian.springkb.dto.AdminImportResult;
+import com.guangqian.springkb.dto.CategoryCreateRequest;
+import com.guangqian.springkb.dto.CategoryDto;
 import com.guangqian.springkb.dto.DocumentDto;
 import com.guangqian.springkb.dto.ImportRequest;
+import com.guangqian.springkb.dto.MemberDto;
+import com.guangqian.springkb.dto.MetaUpdateRequest;
 import com.guangqian.springkb.dto.PageResult;
 import com.guangqian.springkb.ingestion.IngestionService;
 import com.guangqian.springkb.ingestion.ImportResult;
 import com.guangqian.springkb.ingestion.ImportSummary;
+import com.guangqian.springkb.kb.ScanAuditService;
+import com.guangqian.springkb.kb.ScanRuleService;
+import com.guangqian.springkb.kb.SensitiveScanException;
+import com.guangqian.springkb.kb.SensitiveScanService;
+import com.guangqian.springkb.kb.UgcService;
+import com.guangqian.springkb.repository.UserRepository;
+import com.guangqian.springkb.service.AuthService;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -59,25 +70,33 @@ public class AdminService {
     private final JdbcTemplate jdbcTemplate;
     private final IngestionService ingestionService;
     private final JsonMapper jsonMapper;
+    private final UserRepository userRepository;
+    private final ScanRuleService scanRuleService;
+    private final ScanAuditService scanAuditService;
 
-    public AdminService(JdbcTemplate jdbcTemplate, IngestionService ingestionService, JsonMapper jsonMapper) {
+    public AdminService(JdbcTemplate jdbcTemplate, IngestionService ingestionService, JsonMapper jsonMapper,
+                        UserRepository userRepository, ScanRuleService scanRuleService,
+                        ScanAuditService scanAuditService) {
         this.jdbcTemplate = jdbcTemplate;
         this.ingestionService = ingestionService;
         this.jsonMapper = jsonMapper;
+        this.userRepository = userRepository;
+        this.scanRuleService = scanRuleService;
+        this.scanAuditService = scanAuditService;
     }
 
-    // ---------- 1. 文档列表：过滤（source/version/active/keyword）+ 可选分页 ----------
+    // ---------- 1. 文档列表：过滤（product/source/version/active/keyword）+ 可选分页 ----------
 
     /** 全量列表（不分页，默认形态，前端列表/仪表盘直接消费）。 */
-    public List<DocumentDto> listAll(String source, String version, String active, String keyword) {
-        Where w = buildWhere(source, version, active, keyword);
+    public List<DocumentDto> listAll(String product, String source, String version, String active, String keyword) {
+        Where w = buildWhere(product, source, version, active, keyword);
         return jdbcTemplate.query(w.sql(), DOCUMENT_ROW_MAPPER, w.args().toArray());
     }
 
     /** 分页列表：page 从 1 起、size 钳制 1~200；与全量列表共用同一 WHERE。 */
-    public PageResult<DocumentDto> page(String source, String version, String active, String keyword,
+    public PageResult<DocumentDto> page(String product, String source, String version, String active, String keyword,
             int page, int size) {
-        Where w = buildWhere(source, version, active, keyword);
+        Where w = buildWhere(product, source, version, active, keyword);
         long total = jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM kb_document " + w.whereOnly(), Long.class, w.args().toArray());
         int p = Math.max(1, page);
@@ -90,9 +109,13 @@ public class AdminService {
     }
 
     /** 构造 WHERE 子句：参数均以占位符绑定（无 SQL 注入面）；keyword 走 ILIKE 并转义 %/_。 */
-    private Where buildWhere(String source, String version, String active, String keyword) {
-        StringBuilder sql = new StringBuilder("SELECT id, title, authority, version, active, chunk_count, created_at, updated_at FROM kb_document WHERE 1=1");
+    private Where buildWhere(String product, String source, String version, String active, String keyword) {
+        StringBuilder sql = new StringBuilder("SELECT id, title, authority, product, visibility, author, review_status, review_note, version, active, chunk_count, created_at, updated_at FROM kb_document WHERE 1=1");
         List<Object> args = new ArrayList<>();
+        if (product != null && !product.isBlank()) {
+            sql.append(" AND product = ?");
+            args.add(product);
+        }
         if (source != null && !source.isBlank()) {
             sql.append(" AND authority = ?");
             args.add(source);
@@ -133,7 +156,12 @@ public class AdminService {
             rs.getString("id"),
             rs.getString("title"),
             rs.getString("authority"),
+            rs.getString("product"),
             rs.getString("version"),
+            rs.getString("visibility"),
+            rs.getString("author"),
+            rs.getString("review_status"),
+            rs.getString("review_note"),
             rs.getBoolean("active"),
             rs.getInt("chunk_count"),
             toIso(rs.getTimestamp("created_at")),
@@ -234,7 +262,8 @@ public class AdminService {
             markdown = req.text();
         }
         return new RawDocument(
-                rawSource, "manual", req.version(), "en", "manual", req.title(),
+                rawSource, isBlank(req.product()) ? "manual" : req.product().trim(),
+                req.version(), "en", "manual", req.title(),
                 req.url(), req.docKey(), null, List.of(), null,
                 "", markdown, images, headings);
     }
@@ -322,11 +351,170 @@ public class AdminService {
                 }, docId);
     }
 
+    // ---------- 6. 元数据编辑：技术分类 / 版本 / 可见性 ----------
+
+    /**
+     * 编辑文档元数据并同步向量 metadata（product/version/visibility 参与检索过滤与原文外链重建）。
+     *
+     * <p>审核联动：管理员把私有文档改为团队可见时同样要过脱敏扫描并进入待审，避免
+     * 「先建私有、再改团队」绕过审核；改为私有则跳过审核并立即生效。</p>
+     */
+    @Transactional
+    public DocumentDto updateMeta(String docId, MetaUpdateRequest req, String operator) {
+        if (req == null) {
+            throw new IllegalArgumentException("请求体不能为空");
+        }
+        DocumentDto current = findById(docId);
+        String product = isBlank(req.product()) ? current.product() : req.product().trim();
+        String version = isBlank(req.version()) ? current.version() : req.version().trim();
+        String visibility = isBlank(req.visibility()) ? current.visibility() : req.visibility().trim().toLowerCase();
+        if (!"team".equals(visibility) && !"private".equals(visibility)) {
+            throw new IllegalArgumentException("visibility 仅支持 team / private");
+        }
+        boolean becomingTeam = "team".equals(visibility) && !"team".equals(current.visibility());
+        String reviewStatus = current.reviewStatus();
+        boolean clearTrace = false;
+        if ("private".equals(visibility)) {
+            reviewStatus = UgcService.REVIEW_APPROVED;
+            clearTrace = true;
+        } else if (becomingTeam) {
+            SensitiveScanService.Result scan = scanRuleService.scan(current.title() + "\n" + contentOf(docId));
+            if (scan.blocked()) {
+                scanAuditService.record(operator, "admin_meta", current.title(), scan);
+                throw new SensitiveScanException(scan);
+            }
+            reviewStatus = UgcService.REVIEW_PENDING;
+            clearTrace = true;
+        }
+        if (clearTrace) {
+            jdbcTemplate.update("""
+                    UPDATE kb_document
+                    SET product = ?, version = ?, visibility = ?, review_status = ?,
+                        review_note = NULL, reviewed_by = NULL, reviewed_at = NULL, updated_at = now()
+                    WHERE id = ?
+                    """, product, version, visibility, reviewStatus, docId);
+        } else {
+            jdbcTemplate.update(
+                    "UPDATE kb_document SET product = ?, version = ?, visibility = ?, updated_at = now() WHERE id = ?",
+                    product, version, visibility, docId);
+        }
+        jdbcTemplate.update("""
+                UPDATE vector_store SET metadata = jsonb_set(
+                    jsonb_set(jsonb_set(jsonb_set(metadata::jsonb, '{product}', to_jsonb(?::text)),
+                              '{version}', to_jsonb(?::text)),
+                              '{visibility}', to_jsonb(?::text)),
+                    '{review_status}', to_jsonb(?::text))
+                WHERE metadata ->> 'doc_id' = ?
+                """, product, version, visibility, reviewStatus, docId);
+        registerCategory(product, product);
+        return findById(docId);
+    }
+
+    /** 拼接文档正文（用于可见性切换时的脱敏扫描）。 */
+    private String contentOf(String docId) {
+        return jdbcTemplate.query(
+                        "SELECT content_markdown FROM kb_chunk WHERE doc_id = ? ORDER BY ordinal",
+                        (rs, rowNum) -> rs.getString("content_markdown"), docId)
+                .stream()
+                .filter(s -> s != null && !s.isBlank())
+                .reduce((a, b) -> a + "\n\n" + b)
+                .orElse("");
+    }
+
+    // ---------- 7. 技术分类与版本 ----------
+
+    /** 管理端技术分类：注册表 ∪ 文档 product，版本由文档动态聚合（含 private 与未激活文档）。 */
+    public List<CategoryDto> categories() {
+        Map<String, String> names = new LinkedHashMap<>();
+        // 必须用块体 lambda：表达式体 `rs -> map.put(...)` 同时兼容
+        // ResultSetExtractor<String>（有返回值）与 RowCallbackHandler（void），会产生重载歧义
+        jdbcTemplate.query("SELECT product, display_name FROM kb_category ORDER BY product", rs -> {
+            names.put(rs.getString("product"), rs.getString("display_name"));
+        });
+        Map<String, Long> counts = new LinkedHashMap<>();
+        Map<String, List<String>> versions = new LinkedHashMap<>();
+        jdbcTemplate.query("""
+                SELECT product, version, count(*) AS cnt FROM kb_document
+                GROUP BY product, version ORDER BY product, version
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs -> {
+            String product = rs.getString("product");
+            String version = rs.getString("version");
+            if (version == null || version.isBlank()) {
+                version = UgcService.UNVERSIONED;
+            }
+            counts.merge(product, rs.getLong("cnt"), Long::sum);
+            List<String> list = versions.computeIfAbsent(product, k -> new ArrayList<>());
+            if (!list.contains(version)) {
+                list.add(version);
+            }
+        });
+        List<CategoryDto> result = new ArrayList<>();
+        for (var entry : names.entrySet()) {
+            result.add(new CategoryDto(entry.getKey(), entry.getValue(),
+                    counts.getOrDefault(entry.getKey(), 0L), versions.getOrDefault(entry.getKey(), List.of())));
+        }
+        for (var entry : counts.entrySet()) {
+            if (!names.containsKey(entry.getKey())) {
+                result.add(new CategoryDto(entry.getKey(), entry.getKey(), entry.getValue(),
+                        versions.getOrDefault(entry.getKey(), List.of())));
+            }
+        }
+        return result;
+    }
+
+    /** 新增 / 重命名技术分类（product 为主键，重复时更新显示名）。 */
+    public void addCategory(CategoryCreateRequest req) {
+        if (req == null || isBlank(req.product())) {
+            throw new IllegalArgumentException("技术分类标识不能为空");
+        }
+        String product = req.product().trim();
+        String displayName = isBlank(req.displayName()) ? product : req.displayName().trim();
+        registerCategory(product, displayName);
+    }
+
+    private void registerCategory(String product, String displayName) {
+        jdbcTemplate.update("""
+                INSERT INTO kb_category (product, display_name) VALUES (?, ?)
+                ON CONFLICT (product) DO UPDATE SET display_name = EXCLUDED.display_name
+                """, product, displayName);
+    }
+
+    // ---------- 8. 成员与角色管理 ----------
+
+    public List<MemberDto> members() {
+        return userRepository.listMembers();
+    }
+
+    /**
+     * 修改成员角色：只允许 ADMIN / MEMBER；禁止修改自己的角色（避免误操作把自己锁在门外），
+     * 且至少保留一名管理员（禁止降级最后一名 ADMIN）。
+     */
+    @Transactional
+    public MemberDto updateRole(long id, String role, String currentUsername) {
+        if (!AuthService.ROLE_ADMIN.equals(role) && !AuthService.ROLE_MEMBER.equals(role)) {
+            throw new IllegalArgumentException("role 仅支持 ADMIN / MEMBER");
+        }
+        MemberDto target = userRepository.listMembers().stream()
+                .filter(m -> m.id() == id)
+                .findFirst()
+                .orElseThrow(() -> new NotFoundException("成员不存在: " + id));
+        if (target.username().equals(currentUsername)) {
+            throw new IllegalArgumentException("不能修改自己的角色");
+        }
+        if (AuthService.ROLE_ADMIN.equals(target.role()) && AuthService.ROLE_MEMBER.equals(role)
+                && userRepository.countByRole(AuthService.ROLE_ADMIN) <= 1) {
+            throw new IllegalArgumentException("系统至少需要保留一名管理员");
+        }
+        userRepository.updateRole(id, role);
+        return new MemberDto(target.id(), target.username(), target.email(), role, target.createdAt());
+    }
+
     // ---------- helpers ----------
 
     private DocumentDto findById(String docId) {
         return jdbcTemplate.query("""
-                SELECT id, title, authority, version, active, chunk_count, created_at, updated_at
+                SELECT id, title, authority, product, visibility, author, review_status, review_note,
+                       version, active, chunk_count, created_at, updated_at
                 FROM kb_document WHERE id = ?
                 """, DOCUMENT_ROW_MAPPER, docId).stream().findFirst()
                 .orElseThrow(() -> new NotFoundException("文档不存在: " + docId));

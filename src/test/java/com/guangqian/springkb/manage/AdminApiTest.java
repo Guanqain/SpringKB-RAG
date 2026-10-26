@@ -21,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -61,6 +62,9 @@ class AdminApiTest {
 
     @Autowired
     JsonMapper jsonMapper;
+
+    @Autowired
+    PasswordEncoder passwordEncoder;
 
     @MockitoBean
     EmbeddingModel embeddingModel;
@@ -366,11 +370,19 @@ class AdminApiTest {
 
     // ---------- helpers ----------
 
+    /**
+     * 管理接口需要 ADMIN 角色：直接入库一个 ADMIN 再走密码登录。
+     * （注册接口创建的角色取决于库内用户数，且 JWT 角色是登录快照，故不能依赖注册后再改库。）
+     */
     private String registerAndLogin() throws Exception {
         String username = "admin" + uid();
-        String body = json(Map.of("username", username, "password", "123456"));
-        MvcResult r = mockMvc.perform(post("/api/auth/register")
-                        .contentType(APPLICATION_JSON).content(body))
+        jdbcTemplate.update("""
+                INSERT INTO kb_user (username, email, password_hash, role)
+                VALUES (?, ?, ?, 'ADMIN')
+                """, username, username + "@test.local", passwordEncoder.encode("123456"));
+        MvcResult r = mockMvc.perform(post("/api/auth/login")
+                        .contentType(APPLICATION_JSON)
+                        .content(json(Map.of("username", username, "password", "123456"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
                 .andReturn();

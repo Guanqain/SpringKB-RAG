@@ -5,6 +5,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -30,7 +31,7 @@ public abstract class AbstractSitemapCrawler implements DocumentCrawler {
     private static final int POLITE_DELAY_MS = 120;
 
     /** 单页最多尝试次数（网络抖动重试）。 */
-    private static final int MAX_ATTEMPTS = 2;
+    private static final int MAX_ATTEMPTS = 3;
 
     /** 进度日志间隔。 */
     private static final int PROGRESS_EVERY = 50;
@@ -82,13 +83,20 @@ public abstract class AbstractSitemapCrawler implements DocumentCrawler {
         return HtmlText.normalize(title);
     }
 
+    /** 连接配置钩子：个别站点（如 docs.docker.com）需要自定义 TLS 处理。 */
+    protected Connection connection(String url) {
+        return Jsoup.connect(url).userAgent(UA).timeout(FETCH_TIMEOUT_MS);
+    }
+
     @Override
     public List<RawDocument> crawlSample(int limit) {
+        boolean unlimited = limit <= 0;
         List<String[]> entries = collectUrls();
-        log.info("[{}] sitemap 共 {} 个候选 URL", source(), entries.size());
+        log.info("[{}] sitemap 共 {} 个候选 URL，篇数上限={}", source(), entries.size(),
+                unlimited ? "不限" : String.valueOf(limit));
         List<RawDocument> result = new ArrayList<>();
         for (String[] entry : entries) {
-            if (result.size() >= limit) {
+            if (!unlimited && result.size() >= limit) {
                 break;
             }
             try {
@@ -96,7 +104,7 @@ public abstract class AbstractSitemapCrawler implements DocumentCrawler {
                 if (doc != null) {
                     result.add(doc);
                     if (result.size() % PROGRESS_EVERY == 0) {
-                        log.info("[{}] 已抓取 {}/{} 篇", source(), result.size(), limit);
+                        log.info("[{}] 已抓取 {} 篇", source(), result.size());
                     }
                 }
             } catch (Exception e) {
@@ -122,7 +130,7 @@ public abstract class AbstractSitemapCrawler implements DocumentCrawler {
             return;
         }
         try {
-            Document doc = Jsoup.connect(url).userAgent(UA).timeout(FETCH_TIMEOUT_MS).get();
+            Document doc = fetchWithRetry(url);
             if (doc.selectFirst("sitemapindex") != null) {
                 for (Element loc : doc.select("sitemapindex > sitemap > loc")) {
                     parseSitemap(loc.text().trim(), out, seen, depth + 1);
@@ -173,7 +181,7 @@ public abstract class AbstractSitemapCrawler implements DocumentCrawler {
         Exception last = null;
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
-                return Jsoup.connect(url).userAgent(UA).timeout(FETCH_TIMEOUT_MS).get();
+                return connection(url).get();
             } catch (Exception e) {
                 last = e;
                 sleep(400L * attempt);

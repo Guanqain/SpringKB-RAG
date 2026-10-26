@@ -1,18 +1,46 @@
 <script setup lang="ts">
-// 管理后台 · 文档管理：由原 DocumentList 迁移，接口与行为保持不变（/api/admin/documents）。
+// 管理后台 · 文档管理：过滤 / 列表 / 元数据编辑（技术分类·版本·可见性）/ active / 删除 / chunks。
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import { getDocumentChunks } from '@/api/document'
+import {
+  createAdminCategory,
+  getDocumentChunks,
+  listAdminCategories,
+  updateDocumentMeta,
+} from '@/api/document'
 import { useDocumentStore } from '@/stores/document'
+import type { Category, DocumentMetaPayload } from '@/types/admin'
 import type { Chunk, Document } from '@/types/document'
 
 const router = useRouter()
 const store = useDocumentStore()
 
-// 版本下拉从已加载文档动态提取（真实库内版本为 3.x / latest / 4.2-SNAPSHOT 等，非固定 3.2/3.3）
+// 技术分类来自管理端注册表（含文档动态聚合出的版本）
+const categories = ref<Category[]>([])
+
+async function loadCategories() {
+  try {
+    categories.value = await listAdminCategories()
+  } catch {
+    categories.value = []
+  }
+}
+
+const productOptions = computed(() => {
+  const set = new Set<string>()
+  categories.value.forEach((c) => set.add(c.product))
+  store.documents.forEach((d) => d.product && set.add(d.product))
+  return [...set].sort()
+})
+
+// 版本级联：选定分类时只展示该分类下的版本，否则展示全部
 const versionOptions = computed(() => {
+  if (filterForm.product) {
+    const hit = categories.value.find((c) => c.product === filterForm.product)
+    if (hit?.versions.length) return [...hit.versions].sort()
+  }
   const set = new Set<string>()
   store.documents.forEach((d) => d.version && set.add(d.version))
   return [...set].sort()
@@ -20,6 +48,7 @@ const versionOptions = computed(() => {
 
 const filterForm = reactive({
   source: '',
+  product: '',
   version: '',
   active: '',
   keyword: '',
@@ -27,13 +56,22 @@ const filterForm = reactive({
 
 const hasFilter = computed(() =>
   Boolean(
-    filterForm.source || filterForm.version || filterForm.active || filterForm.keyword.trim(),
+    filterForm.source ||
+      filterForm.product ||
+      filterForm.version ||
+      filterForm.active ||
+      filterForm.keyword.trim(),
   ),
 )
+
+function onFilterProductChange() {
+  filterForm.version = ''
+}
 
 function applyFilter() {
   store.filter = {
     source: filterForm.source || undefined,
+    product: filterForm.product || undefined,
     version: filterForm.version || undefined,
     active: filterForm.active || undefined,
     keyword: filterForm.keyword.trim() || undefined,
@@ -43,6 +81,7 @@ function applyFilter() {
 
 function resetFilter() {
   filterForm.source = ''
+  filterForm.product = ''
   filterForm.version = ''
   filterForm.active = ''
   filterForm.keyword = ''
@@ -52,6 +91,7 @@ function resetFilter() {
 
 onMounted(() => {
   store.fetchDocuments()
+  void loadCategories()
 })
 
 async function onToggleActive(doc: Document) {
@@ -97,19 +137,105 @@ async function openChunks(doc: Document) {
     chunksLoading.value = false
   }
 }
+
+// ---------- 元数据编辑（技术分类 / 版本 / 可见性） ----------
+const metaVisible = ref(false)
+const metaSaving = ref(false)
+const metaDocId = ref('')
+const metaForm = reactive<Required<DocumentMetaPayload>>({
+  product: '',
+  version: '',
+  visibility: 'team',
+})
+
+function openMeta(doc: Document) {
+  metaDocId.value = doc.id
+  metaForm.product = doc.product
+  metaForm.version = doc.version
+  metaForm.visibility = doc.visibility
+  metaVisible.value = true
+}
+
+async function saveMeta() {
+  if (!metaForm.product.trim()) {
+    ElMessage.warning('技术分类不能为空')
+    return
+  }
+  metaSaving.value = true
+  try {
+    const updated = await updateDocumentMeta(metaDocId.value, {
+      product: metaForm.product.trim(),
+      version: metaForm.version.trim(),
+      visibility: metaForm.visibility,
+    })
+    const idx = store.documents.findIndex((d) => d.id === updated.id)
+    if (idx >= 0) store.documents[idx] = updated
+    metaVisible.value = false
+    ElMessage.success(
+      updated.reviewStatus === 'pending'
+        ? '已更新：团队可见变更已转入待审核，通过后才会参与检索'
+        : '文档元数据已更新',
+    )
+    void loadCategories()
+  } catch {
+    /* 拦截器已提示 */
+  } finally {
+    metaSaving.value = false
+  }
+}
+
+// ---------- 新增技术分类 ----------
+const categoryVisible = ref(false)
+const categorySaving = ref(false)
+const categoryForm = reactive({ product: '', displayName: '' })
+
+function openCategory() {
+  categoryForm.product = ''
+  categoryForm.displayName = ''
+  categoryVisible.value = true
+}
+
+async function saveCategory() {
+  const product = categoryForm.product.trim()
+  const displayName = categoryForm.displayName.trim() || product
+  if (!product) {
+    ElMessage.warning('请填写技术分类标识')
+    return
+  }
+  categorySaving.value = true
+  try {
+    await createAdminCategory(product, displayName)
+    categoryVisible.value = false
+    ElMessage.success('技术分类已新增')
+    void loadCategories()
+  } catch {
+    /* 拦截器已提示 */
+  } finally {
+    categorySaving.value = false
+  }
+}
 </script>
 
 <template>
   <div>
     <div class="page-head">
       <h2 class="page-head__title">文档管理</h2>
-      <p class="page-head__sub">过滤 · 列表 · active 切换 · 删除 · chunks</p>
+      <p class="page-head__sub">按技术分类 / 版本 / 来源过滤，编辑元数据与可见性，查看 chunk</p>
     </div>
 
     <div class="card filter-bar">
       <el-select v-model="filterForm.source" placeholder="来源" clearable class="w-140">
         <el-option label="官方文档" value="official" />
         <el-option label="社区问答" value="community" />
+      </el-select>
+      <el-select
+        v-model="filterForm.product"
+        placeholder="技术分类"
+        clearable
+        class="w-140"
+        @change="onFilterProductChange"
+      >
+        <el-option v-for="p in productOptions" :key="p" :label="p" :value="p" />
       </el-select>
       <el-select v-model="filterForm.version" placeholder="版本" clearable class="w-120">
         <el-option v-for="v in versionOptions" :key="v" :label="v" :value="v" />
@@ -128,6 +254,7 @@ async function openChunks(doc: Document) {
       <el-button type="primary" @click="applyFilter">查询</el-button>
       <el-button @click="resetFilter">重置</el-button>
       <div class="spacer" />
+      <el-button plain @click="openCategory">新增技术分类</el-button>
       <el-button plain :icon="Plus" @click="router.push('/admin/import')">
         导入文档
       </el-button>
@@ -147,9 +274,21 @@ async function openChunks(doc: Document) {
             </span>
           </template>
         </el-table-column>
+        <el-table-column label="技术分类" width="130">
+          <template #default="{ row }">
+            <span class="badge badge--neutral">{{ row.product || '未分类' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="版本" width="110">
           <template #default="{ row }">
-            <span class="badge badge--neutral">{{ row.version }}</span>
+            <span class="badge badge--neutral">{{ row.version || '未标注' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="可见性" width="100">
+          <template #default="{ row }">
+            <span class="badge" :class="row.visibility === 'private' ? 'badge--private' : 'badge--neutral'">
+              {{ row.visibility === 'private' ? '私有' : '团队' }}
+            </span>
           </template>
         </el-table-column>
         <el-table-column label="状态" width="110">
@@ -170,8 +309,11 @@ async function openChunks(doc: Document) {
             <span class="time-cell">{{ row.updatedAt }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="openMeta(row)">
+              编辑元数据
+            </el-button>
             <el-button link type="primary" size="small" @click="openChunks(row)">
               查看 chunk
             </el-button>
@@ -227,6 +369,48 @@ async function openChunks(doc: Document) {
         </div>
       </div>
     </el-drawer>
+
+    <el-dialog v-model="metaVisible" title="编辑文档元数据" width="420px">
+      <div class="dialog-form">
+        <label class="dialog-field">
+          <span class="dialog-field__label">技术分类</span>
+          <el-input v-model="metaForm.product" placeholder="例如：Spring、MySQL" />
+        </label>
+        <label class="dialog-field">
+          <span class="dialog-field__label">版本</span>
+          <el-input v-model="metaForm.version" placeholder="留空表示未标注" />
+        </label>
+        <label class="dialog-field">
+          <span class="dialog-field__label">可见性</span>
+          <el-select v-model="metaForm.visibility" style="width: 100%">
+            <el-option label="团队可见（参与检索）" value="team" />
+            <el-option label="仅作者可见（不参与检索）" value="private" />
+          </el-select>
+        </label>
+      </div>
+      <template #footer>
+        <el-button @click="metaVisible = false">取消</el-button>
+        <el-button type="primary" :loading="metaSaving" @click="saveMeta">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="categoryVisible" title="新增技术分类" width="400px">
+      <div class="dialog-form">
+        <label class="dialog-field">
+          <span class="dialog-field__label">分类标识（product）</span>
+          <el-input v-model="categoryForm.product" placeholder="例如：Kafka" />
+        </label>
+        <label class="dialog-field">
+          <span class="dialog-field__label">展示名称</span>
+          <el-input v-model="categoryForm.displayName" placeholder="缺省与标识一致" />
+        </label>
+        <p class="dialog-hint">新增的分类会立即出现在筛选器与写文档页的分类建议中。</p>
+      </div>
+      <template #footer>
+        <el-button @click="categoryVisible = false">取消</el-button>
+        <el-button type="primary" :loading="categorySaving" @click="saveCategory">新增</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -409,5 +593,30 @@ async function openChunks(doc: Document) {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.dialog-field__label {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink-600);
+}
+
+.dialog-hint {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--ink-500);
+  line-height: 1.6;
 }
 </style>

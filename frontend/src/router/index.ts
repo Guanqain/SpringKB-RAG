@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { TOKEN_KEY } from '@/utils/constants'
+import { useAuthStore } from '@/stores/auth'
 import Home from '@/views/Home.vue'
 import QaHome from '@/views/QaHome.vue'
 import KbHome from '@/views/KbHome.vue'
@@ -16,6 +17,8 @@ import AdminMembers from '@/views/admin/AdminMembers.vue'
 import AdminQaStats from '@/views/admin/AdminQaStats.vue'
 import AdminBlindspots from '@/views/admin/AdminBlindspots.vue'
 import AdminReview from '@/views/admin/AdminReview.vue'
+import AdminModeration from '@/views/admin/AdminModeration.vue'
+import AdminScanRules from '@/views/admin/AdminScanRules.vue'
 import AdminRagDebug from '@/views/admin/AdminRagDebug.vue'
 
 const routes: RouteRecordRaw[] = [
@@ -53,7 +56,7 @@ const routes: RouteRecordRaw[] = [
     path: '/setup',
     name: 'setup',
     component: Setup,
-    meta: { standalone: true, title: '首次启动向导' },
+    meta: { public: true, standalone: true, title: '首次启动向导' },
   },
   {
     path: '/me',
@@ -109,6 +112,18 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '知识盲区' },
       },
       {
+        path: 'moderation',
+        name: 'admin-moderation',
+        component: AdminModeration,
+        meta: { title: '内容审核' },
+      },
+      {
+        path: 'scan-rules',
+        name: 'admin-scan-rules',
+        component: AdminScanRules,
+        meta: { title: '脱敏规则' },
+      },
+      {
         path: 'review',
         name: 'admin-review',
         component: AdminReview,
@@ -129,8 +144,9 @@ const router = createRouter({
   routes,
 })
 
-// 登录态守卫（语义同 v1）：public 白名单 = /qa、/login；已登录访问 /login 跳首页；受保护页未登录 → /login
-router.beforeEach((to) => {
+// 登录态守卫（语义同 v1）：public 白名单 = /qa、/login、/setup；已登录访问 /login 跳首页；
+// 受保护页未登录 → /login；/admin/** 额外校验 ADMIN 角色
+router.beforeEach(async (to) => {
   const loggedIn = Boolean(localStorage.getItem(TOKEN_KEY))
   if (to.meta.public) {
     if (to.name === 'login' && loggedIn) {
@@ -140,6 +156,16 @@ router.beforeEach((to) => {
   }
   if (!loggedIn) {
     return { path: '/login', query: { redirect: to.fullPath } }
+  }
+  if (to.path.startsWith('/admin')) {
+    const auth = useAuthStore()
+    // main.ts 的 restoreSession 是异步的，刷新后 user 可能尚未就绪
+    if (!auth.user) {
+      await auth.restoreSession()
+    }
+    if (!auth.isAdmin) {
+      return { path: '/' }
+    }
   }
   return true
 })

@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { fetchKbDoc } from '@/api/kb'
 import { setDocFavorite, setDocLike } from '@/api/me'
+import { setUgcVisibility } from '@/api/ugc'
+import { useAuthStore } from '@/stores/auth'
 import { renderMarkdown } from '@/utils/markdown'
 import type { KbDocDetail } from '@/types/kb'
 
 const route = useRoute()
+const auth = useAuthStore()
 const docId = computed(() => String(route.params.id ?? ''))
 
 const detail = ref<KbDocDetail | null>(null)
@@ -65,11 +69,44 @@ async function toggleFavorite() {
 
 const html = computed(() => renderMarkdown(detail.value?.markdown ?? ''))
 
+// 可见性切换：作者本人或管理员
+const canToggleVisibility = computed(() => {
+  if (!detail.value || !auth.user) return false
+  return auth.isAdmin || detail.value.author === auth.user.username
+})
+const visibilityPending = ref(false)
+
+async function toggleVisibility() {
+  if (!detail.value || visibilityPending.value) return
+  const next = detail.value.visibility === 'private' ? 'team' : 'private'
+  visibilityPending.value = true
+  try {
+    const reviewStatus = await setUgcVisibility(detail.value.id, next)
+    detail.value = { ...detail.value, visibility: next, reviewStatus: reviewStatus as KbDocDetail['reviewStatus'] }
+    if (next === 'private') {
+      ElMessage.success('已设为仅自己可见（免扫描、免审核）')
+    } else if (reviewStatus === 'pending') {
+      ElMessage.success('已提交管理员审核，通过后才会进入知识库')
+    } else {
+      ElMessage.success('已设为团队可见')
+    }
+  } catch {
+    /* 拦截器已提示 */
+  } finally {
+    visibilityPending.value = false
+  }
+}
+
 const authorityLabel = computed(() => {
   if (detail.value?.authority === 'official') return '官方'
   if (detail.value?.authority === 'ugc') return '团队'
   return '社区'
 })
+
+// 审核横幅仅作者与管理员能看到（后端对其他人直接 404，不会打开此页）
+const isAuthor = computed(
+  () => Boolean(detail.value?.author && auth.user && detail.value.author === auth.user.username),
+)
 
 watch(docId, () => void load())
 onMounted(() => void load())
@@ -92,6 +129,7 @@ onMounted(() => void load())
             <span class="badge" :class="detail.authority === 'official' ? 'badge--official' : 'badge--community'">
               {{ authorityLabel }}
             </span>
+            <span v-if="detail.visibility === 'private'" class="badge badge--private">私有</span>
             <span v-if="detail.version" class="num meta-item">{{ detail.version }}</span>
             <span v-if="detail.docType" class="meta-item">{{ detail.docType }}</span>
             <span v-if="detail.language" class="meta-item">{{ detail.language }}</span>
@@ -104,6 +142,15 @@ onMounted(() => void load())
           <router-link class="btn btn--primary" :to="{ path: '/qa', query: { doc: detail.id } }">
             + 基于本文提问
           </router-link>
+          <button
+            v-if="canToggleVisibility"
+            class="btn btn--outline"
+            type="button"
+            :disabled="visibilityPending"
+            @click="toggleVisibility"
+          >
+            {{ detail.visibility === 'private' ? '设为团队可见' : '设为私有' }}
+          </button>
           <button
             class="btn btn--outline"
             :class="{ 'btn--on': detail.liked }"
@@ -124,6 +171,28 @@ onMounted(() => void load())
           </button>
         </div>
       </header>
+
+      <!-- 审核状态横幅：仅作者/管理员能打开待审与驳回文档 -->
+      <div v-if="detail.reviewStatus === 'pending'" class="review-banner">
+        <div class="review-banner__main">
+          <strong class="review-banner__title">待管理员审核</strong>
+          <span class="review-banner__text">审核通过后才会进入知识库，被他人检索与问答引用；当前仅你与管理员可见。</span>
+        </div>
+      </div>
+      <div v-else-if="detail.reviewStatus === 'rejected'" class="review-banner review-banner--rejected">
+        <div class="review-banner__main">
+          <strong class="review-banner__title">审核已驳回</strong>
+          <span v-if="detail.reviewNote" class="review-banner__text">理由：{{ detail.reviewNote }}</span>
+          <span class="review-banner__text">请根据审核意见修改后重新提交。</span>
+        </div>
+        <router-link
+          v-if="isAuthor"
+          class="btn btn--outline"
+          :to="{ path: '/editor', query: { docId: detail.id } }"
+        >
+          编辑并重新提交
+        </router-link>
+      </div>
 
       <!-- 正文区：Markdown 渲染（纸面直排，无卡片外壳） -->
       <article class="doc-body">
@@ -233,6 +302,41 @@ onMounted(() => void load())
 .doc-hero__actions .btn--on {
   color: var(--brand-600);
   border-color: var(--brand-600);
+}
+
+/* 审核状态横幅：克制的浅色底 + hairline，不喧宾夺主 */
+.review-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-top: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  background: #fffbeb;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+}
+
+.review-banner--rejected {
+  background: #fef2f2;
+}
+
+.review-banner__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.review-banner__title {
+  font-size: var(--fs-sm);
+  color: var(--ink-900);
+}
+
+.review-banner__text {
+  font-size: var(--fs-sm);
+  color: var(--ink-600);
+  line-height: 1.6;
 }
 
 /* 正文区：纸面直排，不使用卡片外壳 */

@@ -203,7 +203,7 @@ public class RagTraceService {
                 SELECT c.id, d.title, d.version, d.section, d.authority,
                        c.heading_path, char_length(c.content_markdown) AS content_chars
                 FROM kb_chunk c JOIN kb_document d ON d.id = c.doc_id
-                WHERE c.id IN (%s)
+                WHERE c.id IN (%s) AND d.visibility = 'team'
                 """.formatted(placeholders);
         Map<String, Map<String, Object>> rows = new HashMap<>();
         jdbcTemplate.query(sql, rs -> {
@@ -220,10 +220,11 @@ public class RagTraceService {
     }
 
     private static String buildFilterLabel(String version) {
+        String base = "active == 'true' && visibility == 'team'";
         if (version == null || version.isBlank()) {
-            return "active == 'true'";
+            return base;
         }
-        return "active == 'true' && version == '" + version + "'";
+        return base + " && version == '" + version + "'";
     }
 
     /** 重排前后顺序是否变化（按 id 序列比较）。 */

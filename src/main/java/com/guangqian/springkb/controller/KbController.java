@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.guangqian.springkb.common.ApiResponse;
 import com.guangqian.springkb.common.NotFoundException;
+import com.guangqian.springkb.dto.CategoryDto;
 import com.guangqian.springkb.dto.KbDocCard;
 import com.guangqian.springkb.dto.KbDocDetail;
 import com.guangqian.springkb.dto.KbOverview;
@@ -34,13 +35,13 @@ public class KbController {
     }
 
     @GetMapping("/overview")
-    public ApiResponse<KbOverview> overview() {
-        return ApiResponse.ok(kbService.overview());
+    public ApiResponse<KbOverview> overview(Authentication authentication) {
+        return ApiResponse.ok(kbService.overview(CurrentUser.username(authentication)));
     }
 
     @GetMapping("/tree")
-    public ApiResponse<List<KbTreeNode>> tree() {
-        return ApiResponse.ok(kbService.tree());
+    public ApiResponse<List<KbTreeNode>> tree(Authentication authentication) {
+        return ApiResponse.ok(kbService.tree(CurrentUser.username(authentication)));
     }
 
     /** 文档卡分页：page 从 1 起、size 钳制 1~100（默认 12）。 */
@@ -51,8 +52,16 @@ public class KbController {
             @RequestParam(required = false) String source,
             @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "12") int size) {
-        return ApiResponse.ok(kbService.docsPage(product, version, source, keyword, page, size));
+            @RequestParam(defaultValue = "12") int size,
+            Authentication authentication) {
+        return ApiResponse.ok(kbService.docsPage(product, version, source, keyword, page, size,
+                CurrentUser.username(authentication)));
+    }
+
+    /** 技术分类及各自版本（用户端筛选元数据）。 */
+    @GetMapping("/categories")
+    public ApiResponse<List<CategoryDto>> categories() {
+        return ApiResponse.ok(kbService.categories());
     }
 
     @GetMapping("/doc/{id}")

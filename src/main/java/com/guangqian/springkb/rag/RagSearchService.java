@@ -88,15 +88,23 @@ public class RagSearchService {
         return new ArrayList<>(reranked.subList(0, topK));
     }
 
-    /** 构造 filter expression：恒有 {@code active == 'true'}；version 非空时追加 {@code && version == '<v>'}。 */
+    /**
+     * 构造 filter expression：恒有
+     * {@code active == 'true' && visibility == 'team' && review_status == 'approved'}；
+     * version 非空时追加 {@code && version == '<v>'}。
+     *
+     * <p>可见性与审核状态在检索层强制下推：private 文档与待审/驳回文档永远不会进入问答候选，
+     * 即使提问者是作者本人（private 的语义是「不进团队知识库」，待审文档尚未通过审核）。</p>
+     */
     private String buildFilter(String version) {
+        String base = "active == 'true' && visibility == 'team' && review_status == 'approved'";
         if (version == null || version.isBlank()) {
-            return "active == 'true'";
+            return base;
         }
         if (ILLEGAL_VERSION.matcher(version).find()) {
             throw new IllegalArgumentException("非法的 version 参数: " + version);
         }
-        return "active == 'true' && version == '" + version + "'";
+        return base + " && version == '" + version + "'";
     }
 
     private Map<String, Object> toRow(Document doc) {

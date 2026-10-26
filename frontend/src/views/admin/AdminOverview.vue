@@ -1,28 +1,47 @@
 <script setup lang="ts">
 // 管理后台 · 概览：由原 Dashboard 迁移，数据均来自 /api/admin/documents 真实聚合。
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import StatCard from '@/components/StatCard.vue'
-import { useDocumentStore } from '@/stores/document'
+import { listAdminCategories, listDocuments } from '@/api/document'
+import type { Category } from '@/types/admin'
+import type { Document } from '@/types/document'
 
 const router = useRouter()
-const store = useDocumentStore()
 
-onMounted(() => {
-  store.fetchDocuments()
+// 概览必须统计全量文档：不能复用文档管理页的 store.filter，
+// 否则从「文档管理」带着筛选条件回到概览时，技术分布只会剩下被筛中的分类。
+const documents = ref<Document[]>([])
+const loading = ref(false)
+// product → 展示名：技术分类注册表可自定义展示名，未配置时回落到 product 本身
+const displayNames = ref<Record<string, string>>({})
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    const categories = await listAdminCategories().catch(() => [] as Category[])
+    displayNames.value = Object.fromEntries(
+      categories.map((c) => [c.product, c.displayName || c.product]),
+    )
+    documents.value = await listDocuments()
+  } catch {
+    documents.value = []
+  } finally {
+    loading.value = false
+  }
 })
 
-const totalDocs = computed(() => store.documents.length)
+const totalDocs = computed(() => documents.value.length)
 const totalChunks = computed(() =>
-  store.documents.reduce((sum, d) => sum + d.chunkCount, 0),
+  documents.value.reduce((sum, d) => sum + d.chunkCount, 0),
 )
 const activeCount = computed(
-  () => store.documents.filter((d) => d.active).length,
+  () => documents.value.filter((d) => d.active).length,
 )
 const inactiveCount = computed(
-  () => store.documents.filter((d) => !d.active).length,
+  () => documents.value.filter((d) => !d.active).length,
 )
-const hasData = computed(() => store.documents.length > 0)
+const hasData = computed(() => documents.value.length > 0)
 
 interface DistItem {
   label: string
@@ -32,25 +51,25 @@ interface DistItem {
 
 const sourceDist = computed<DistItem[]>(() => {
   const total = totalDocs.value || 1
-  const official = store.documents.filter((d) => d.source === 'official').length
-  const community = store.documents.filter((d) => d.source === 'community').length
+  const official = documents.value.filter((d) => d.source === 'official').length
+  const community = documents.value.filter((d) => d.source === 'community').length
   return [
     { label: '官方文档 official', count: official, pct: (official / total) * 100 },
     { label: '社区问答 community', count: community, pct: (community / total) * 100 },
   ]
 })
 
-const versionDist = computed<DistItem[]>(() => {
+const productDist = computed<DistItem[]>(() => {
   const total = totalDocs.value || 1
   const counts = new Map<string, number>()
-  store.documents.forEach((d) => {
-    const v = d.version || '未知'
-    counts.set(v, (counts.get(v) || 0) + 1)
+  documents.value.forEach((d) => {
+    const product = d.product || '未分类'
+    counts.set(product, (counts.get(product) || 0) + 1)
   })
   return [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
-    .map(([version, count]) => ({
-      label: `版本 ${version}`,
+    .map(([product, count]) => ({
+      label: displayNames.value[product] ?? product,
       count,
       pct: (count / total) * 100,
     }))
@@ -66,7 +85,7 @@ const activeDist = computed<DistItem[]>(() => {
 </script>
 
 <template>
-  <div>
+  <div v-loading="loading">
     <div class="page-head">
       <h2 class="page-head__title">概览</h2>
       <p class="page-head__sub">团队知识库整体概况（数据来自 admin documents 聚合）</p>
@@ -95,8 +114,8 @@ const activeDist = computed<DistItem[]>(() => {
         </section>
 
         <section class="panel">
-          <h3 class="panel-title">版本分布</h3>
-          <div v-for="item in versionDist" :key="item.label" class="dist-row">
+          <h3 class="panel-title">技术分布</h3>
+          <div v-for="item in productDist" :key="item.label" class="dist-row">
             <div class="dist-head">
               <span>{{ item.label }}</span>
               <span class="num dist-count">{{ item.count }} · {{ item.pct.toFixed(0) }}%</span>

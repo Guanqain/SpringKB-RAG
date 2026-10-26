@@ -39,6 +39,20 @@ public class IngestionService {
             Map.entry("vite", "official"),
             Map.entry("vuerouter", "official"),
             Map.entry("pinia", "official"),
+            Map.entry("go", "official"),
+            Map.entry("python", "official"),
+            Map.entry("fastapi", "official"),
+            Map.entry("django", "official"),
+            Map.entry("docker", "official"),
+            Map.entry("kubernetes", "official"),
+            Map.entry("postgresql", "official"),
+            Map.entry("mysql", "official"),
+            Map.entry("kafka", "official"),
+            Map.entry("langchain", "official"),
+            Map.entry("nodejs", "official"),
+            Map.entry("typescript", "official"),
+            Map.entry("react", "official"),
+            Map.entry("rust", "official"),
             Map.entry("stackoverflow", "community"),
             Map.entry("manual-official", "official"),
             Map.entry("manual-community", "community"),
@@ -55,6 +69,20 @@ public class IngestionService {
             Map.entry("vite", "vite.dev"),
             Map.entry("vuerouter", "router.vuejs.org"),
             Map.entry("pinia", "pinia.vuejs.org"),
+            Map.entry("go", "go.dev"),
+            Map.entry("python", "docs.python.org"),
+            Map.entry("fastapi", "fastapi.tiangolo.com"),
+            Map.entry("django", "docs.djangoproject.com"),
+            Map.entry("docker", "docs.docker.com"),
+            Map.entry("kubernetes", "kubernetes.io"),
+            Map.entry("postgresql", "postgresql.org"),
+            Map.entry("mysql", "dev.mysql.com"),
+            Map.entry("kafka", "kafka.apache.org"),
+            Map.entry("langchain", "docs.langchain.com"),
+            Map.entry("nodejs", "nodejs.org"),
+            Map.entry("typescript", "typescriptlang.org"),
+            Map.entry("react", "zh-hans.react.dev"),
+            Map.entry("rust", "doc.rust-lang.org"),
             Map.entry("stackoverflow", "stackoverflow.com"),
             Map.entry("manual-official", "manual"),
             Map.entry("manual-community", "stackoverflow.com"),
@@ -169,6 +197,10 @@ public class IngestionService {
         meta.put("authority", authority);
         meta.put("version", doc.version());
         meta.put("active", "true");
+        // 可见性在检索层过滤：默认 team（团队可见、可引用）；UGC 发布为 private 时由 UgcService 回写
+        meta.put("visibility", "team");
+        // 审核状态同属下推过滤条件：爬虫/管理端导入默认 approved；UGC 团队文档由 UgcService 改为 pending
+        meta.put("review_status", "approved");
         meta.put("doc_type", doc.docType() == null || doc.docType().isBlank() ? DEFAULT_DOC_TYPE : doc.docType());
         meta.put("language", doc.language() == null || doc.language().isBlank() ? DEFAULT_LANGUAGE : doc.language());
         meta.put("title", doc.title());
@@ -185,8 +217,9 @@ public class IngestionService {
     private void insertDocument(RawDocument doc, String docId, String origin, String authority) {
         jdbcTemplate.update("""
                 INSERT INTO kb_document
-                    (id, product, title, origin, authority, version, doc_key, doc_type, language, section, active, last_modified, chunk_count)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true, ?, 0)
+                    (id, product, title, origin, authority, version, doc_key, doc_type, language, section,
+                     active, visibility, review_status, last_modified, chunk_count)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, true, 'team', 'approved', ?, 0)
                 """,
                 docId,
                 doc.product(),

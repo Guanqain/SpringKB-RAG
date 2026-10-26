@@ -1,4 +1,9 @@
 # 集成测试专用库（springkb_test，docker 容器 rag-postgres 管理，允许残留数据）
+app:
+  auth:
+    # 测试环境回显 devCode，让集成测试可走完整「发码 → 注册/登录」链路
+    code-echo: true
+
 spring:
   datasource:
     url: jdbc:postgresql://localhost:63892/springkb_test

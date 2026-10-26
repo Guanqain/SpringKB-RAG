@@ -53,6 +53,39 @@ class OriginalUrlResolverTest {
     }
 
     @Test
+    void resolvesExpandedOfficialSources() {
+        assertThat(OriginalUrlResolver.resolve("go", "go.dev", "latest", "doc/effective_go"))
+                .isEqualTo("https://go.dev/doc/effective_go");
+        assertThat(OriginalUrlResolver.resolve("python", "docs.python.org", "3", "tutorial/index"))
+                .isEqualTo("https://docs.python.org/zh-cn/3/tutorial/index.html");
+        assertThat(OriginalUrlResolver.resolve("fastapi", "fastapi.tiangolo.com", "latest", "tutorial/first-steps"))
+                .isEqualTo("https://fastapi.tiangolo.com/zh/tutorial/first-steps/");
+        assertThat(OriginalUrlResolver.resolve("django", "docs.djangoproject.com", "5.2", "topics/db/models"))
+                .isEqualTo("https://docs.djangoproject.com/zh-hans/5.2/topics/db/models/");
+        assertThat(OriginalUrlResolver.resolve("docker", "docs.docker.com", "latest", "get-started"))
+                .isEqualTo("https://docs.docker.com/get-started/");
+        assertThat(OriginalUrlResolver.resolve("kubernetes", "kubernetes.io", "latest", "concepts/overview"))
+                .isEqualTo("https://kubernetes.io/zh-cn/docs/concepts/overview/");
+        assertThat(OriginalUrlResolver.resolve("postgresql", "postgresql.org", "current", "tutorial-sql"))
+                .isEqualTo("https://www.postgresql.org/docs/current/tutorial-sql.html");
+        assertThat(OriginalUrlResolver.resolve("mysql", "dev.mysql.com", "8.4", "select"))
+                .isEqualTo("https://dev.mysql.com/doc/refman/8.4/en/select.html");
+        assertThat(OriginalUrlResolver.resolve("kafka", "kafka.apache.org", "43", "design/design"))
+                .isEqualTo("https://kafka.apache.org/43/design/design/");
+        assertThat(OriginalUrlResolver.resolve("langchain", "docs.langchain.com", "latest", "langchain/overview"))
+                .isEqualTo("https://docs.langchain.com/oss/python/langchain/overview");
+        assertThat(OriginalUrlResolver.resolve("nodejs", "nodejs.org", "latest", "fs"))
+                .isEqualTo("https://nodejs.org/api/fs.html");
+        assertThat(OriginalUrlResolver.resolve("typescript", "typescriptlang.org", "latest",
+                "handbook/2/basic-types"))
+                .isEqualTo("https://www.typescriptlang.org/zh/docs/handbook/2/basic-types.html");
+        assertThat(OriginalUrlResolver.resolve("react", "zh-hans.react.dev", "latest", "learn"))
+                .isEqualTo("https://zh-hans.react.dev/learn");
+        assertThat(OriginalUrlResolver.resolve("rust", "doc.rust-lang.org", "book", "ch01-00-getting-started"))
+                .isEqualTo("https://doc.rust-lang.org/book/ch01-00-getting-started.html");
+    }
+
+    @Test
     void returnsNullForUnreconstructableSources() {
         // 未知站点 / manual / ugc(team)
         assertThat(OriginalUrlResolver.resolve("vue", "example.com", "3.x", "foo")).isNull();

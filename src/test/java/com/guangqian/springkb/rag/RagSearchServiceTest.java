@@ -233,7 +233,7 @@ class RagSearchServiceTest {
 
         Map<String, Object> meta = hit.getMetadata();
         assertThat(meta).containsKeys("doc_id", "product", "origin", "authority", "version",
-                "active", "doc_type", "language", "title");
+                "active", "visibility", "doc_type", "language", "title");
         assertThat(meta.get("doc_id")).isEqualTo(docId);
         assertThat(meta.get("product")).isEqualTo(doc.product());
         assertThat(meta.get("origin")).isEqualTo("spring.io");
@@ -260,14 +260,18 @@ class RagSearchServiceTest {
                         .text(text)
                         .metadata(Map.of(
                                 "doc_id", officialDocId, "authority", "official",
-                                "version", version, "active", "true", "title", "official title"))
+                                "version", version, "active", "true", "visibility", "team",
+                                "review_status", "approved",
+                                "title", "official title"))
                         .build(),
                 Document.builder()
                         .id(communityDocId + "-0")
                         .text(text)
                         .metadata(Map.of(
                                 "doc_id", communityDocId, "authority", "community",
-                                "version", version, "active", "true", "title", "community title"))
+                                "version", version, "active", "true", "visibility", "team",
+                                "review_status", "approved",
+                                "title", "community title"))
                         .build()));
 
         List<Map<String, Object>> rows = ragSearchService.search(text, version, 2);

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
@@ -7,9 +7,6 @@ import { useAuthStore } from '@/stores/auth'
 const auth = useAuthStore()
 const router = useRouter()
 const open = ref(false)
-
-/** 后端 role 为大写枚举（ADMIN/MEMBER），这里统一归一化后判断 */
-const isAdmin = computed(() => auth.user?.role?.toUpperCase() === 'ADMIN')
 
 const menuItems = [
   { label: '个人中心', to: '/me' },
@@ -70,7 +67,7 @@ function onLogout() {
       <div class="user-menu__header">
         <div class="user-menu__name">
           {{ auth.user?.username ?? '已登录' }}
-          <span v-if="isAdmin" class="badge--admin">管理员</span>
+          <span v-if="auth.isAdmin" class="badge--admin">管理员</span>
         </div>
         <div class="user-menu__ws">SpringKB 团队</div>
       </div>
@@ -84,9 +81,9 @@ function onLogout() {
         {{ item.label }}
       </a>
 
-      <div class="user-menu__divider"></div>
+      <div v-if="auth.isAdmin" class="user-menu__divider"></div>
 
-      <a class="user-menu__item" @click.prevent="go('/admin')">
+      <a v-if="auth.isAdmin" class="user-menu__item" @click.prevent="go('/admin')">
         管理后台
         <span class="user-menu__tag user-menu__tag--admin">admin</span>
       </a>

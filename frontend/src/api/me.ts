@@ -5,11 +5,22 @@ import type {
   ConversationDetail,
   ConversationSummary,
   InteractionResult,
+  NotificationList,
 } from '@/types/me'
 
 /** GET /api/me/documents：我写过的文档（UGC 归属） */
 export function fetchMyDocuments(): Promise<KbDocCard[]> {
   return http.get<KbDocCard[]>('/me/documents')
+}
+
+/** POST /api/me/password：修改密码（校验旧密码） */
+export function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+  return http.post('/me/password', { oldPassword, newPassword })
+}
+
+/** POST /api/me/email：绑定 / 换绑邮箱（需验证码） */
+export function bindEmail(email: string, code: string): Promise<void> {
+  return http.post('/me/email', { email, code })
 }
 
 /** GET /api/me/favorites：我的收藏 */
@@ -60,4 +71,19 @@ export function appendConversationMessage(
   payload: AppendMessagePayload,
 ): Promise<ConversationDetail> {
   return http.post<ConversationDetail>(`/me/conversations/${id}/messages`, payload, { timeout: 30000 })
+}
+
+/** 站内通知（审核结果）+ 未读数 */
+export function fetchNotifications(limit = 20): Promise<NotificationList> {
+  return http.get<NotificationList>('/me/notifications', { params: { limit } })
+}
+
+/** 单条通知标记已读 */
+export function markNotificationRead(id: number): Promise<void> {
+  return http.post<void>(`/me/notifications/${id}/read`)
+}
+
+/** 全部通知标记已读，返回更新条数 */
+export function markAllNotificationsRead(): Promise<number> {
+  return http.post<number>('/me/notifications/read-all')
 }

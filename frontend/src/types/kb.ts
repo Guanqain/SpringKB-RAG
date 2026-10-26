@@ -23,6 +23,9 @@ export interface KbTreeNode {
   children: KbTreeNode[]
 }
 
+/** 审核状态：approved 已通过（含无需审核）/ pending 待审核 / rejected 已驳回 */
+export type ReviewStatus = 'approved' | 'pending' | 'rejected'
+
 /** GET /api/kb/docs 文档卡列表项 */
 export interface KbDocCard {
   id: string
@@ -38,6 +41,11 @@ export interface KbDocCard {
   originalUrl: string | null
   /** UGC 文档的写入用户；爬虫/管理端导入为 null */
   author: string | null
+  /** team = 团队可见；private = 仅作者可见（不参与问答引用） */
+  visibility: 'team' | 'private'
+  reviewStatus: ReviewStatus
+  /** 驳回理由（作者可见） */
+  reviewNote: string | null
 }
 
 /** GET /api/kb/doc/{id} 文档详情 */
@@ -62,10 +70,31 @@ export interface KbDocDetail {
   favoriteCount: number
   liked: boolean
   favorited: boolean
+  visibility: 'team' | 'private'
+  reviewStatus: ReviewStatus
+  reviewNote: string | null
 }
 
 /** POST /api/ugc/documents 发布结果 */
 export interface UgcPublishResult {
   docId: string
   chunkCount: number
+  visibility: 'team' | 'private'
+  reviewStatus: ReviewStatus
+  /** 后端面向用户的提示文案（待审 / 私有已发布） */
+  message: string
+}
+
+/** 脱敏扫描命中项（samples 已打码） */
+export interface ScanFinding {
+  type: string
+  label: string
+  count: number
+  samples: string[]
+}
+
+/** POST /api/ugc/scan 结果；blocked=true 时不可发布 */
+export interface ScanResult {
+  blocked: boolean
+  findings: ScanFinding[]
 }

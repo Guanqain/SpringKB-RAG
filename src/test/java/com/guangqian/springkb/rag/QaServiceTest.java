@@ -243,9 +243,42 @@ class QaServiceTest {
         assertThat(s.snippet()).contains("part one").contains("part two");
     }
 
-    // ---------- 6. 阈值参数化见 QaServiceFallbackTest（阈值 1.0 需独立上下文） ----------
+    // ---------- 6. 弱相关来源被过滤：只有 maxScore ≥ 阈值的文档进 sources/prompt ----------
+    @Test
+    void weakSourcesAreFilteredOut() {
+        stubAnswer("[1] 官方文档说明配置步骤。");
+        seedChunk("qa-strong-" + uid(), "How to config CDS in Spring Boot",
+                "official", "3.x", "Spring Boot CDS", "deployment/cds");
+        String weakDocId = "qa-weak-" + uid();
+        seedChunk(weakDocId, "How to install PostgreSQL on Windows",
+                "official", "3.x", "PostgreSQL Install", "deployment/postgres");
 
-    // ---------- 7. 控制器契约：question 必填 400；合法请求 code=0 且 data.found 正确 ----------
+        QaResult result = qaService.ask("如何配置 CDS", null, 5);
+
+        assertThat(result.found()).isTrue();
+        assertThat(result.sources()).hasSize(1);
+        assertThat(result.sources()).extracting(SourceRef::title).containsExactly("Spring Boot CDS");
+        assertThat(result.sources()).extracting(SourceRef::docId).doesNotContain(weakDocId);
+        assertThat(result.sources().get(0).index()).isEqualTo(1);
+    }
+
+    // ---------- 7. 模型判定无法回答：不展示无意义引用 ----------
+    @Test
+    void modelNoAnswerDropsSources() {
+        stubAnswer(QaService.NO_ANSWER);
+        seedChunk("qa-na-" + uid(), "How to config CDS in Spring Boot",
+                "official", "3.x", "Spring Boot CDS", "deployment/cds");
+
+        QaResult result = qaService.ask("如何配置 CDS", null, 5);
+
+        assertThat(result.found()).isFalse();
+        assertThat(result.answer()).isEqualTo(QaService.NO_ANSWER);
+        assertThat(result.sources()).isEmpty();
+    }
+
+    // ---------- 8. 阈值参数化见 QaServiceFallbackTest（阈值 1.0 需独立上下文） ----------
+
+    // ---------- 9. 控制器契约：question 必填 400；合法请求 code=0 且 data.found 正确 ----------
     @Test
     void controllerValidatesQuestionAndReturnsFound() throws Exception {
         mockMvc.perform(post("/api/qa/ask").contentType(APPLICATION_JSON).content("{}"))
@@ -265,7 +298,7 @@ class QaServiceTest {
                 .andExpect(jsonPath("$.data.sources[0].index").value(1));
     }
 
-    // ---------- 8. 模型调用失败：转领域异常，控制器返回 503 而不是挂起 ----------
+    // ---------- 10. 模型调用失败：转领域异常，控制器返回 503 而不是挂起 ----------
     @Test
     void modelFailureMapsTo503() throws Exception {
         seedChunk("qa-f-" + uid(), "How to config CDS in Spring Boot",
@@ -308,16 +341,18 @@ class QaServiceTest {
         vectorStore.add(List.of(Document.builder()
                 .id(chunkId)
                 .text(text)
-                .metadata(Map.of(
-                        "doc_id", docId,
-                        "product", "spring-boot",
-                        "origin", "spring.io",
-                        "authority", authority,
-                        "version", version,
-                        "active", "true",
-                        "doc_type", "reference",
-                        "language", "en",
-                        "title", title))
+                .metadata(Map.ofEntries(
+                        Map.entry("doc_id", docId),
+                        Map.entry("product", "spring-boot"),
+                        Map.entry("origin", "spring.io"),
+                        Map.entry("authority", authority),
+                        Map.entry("version", version),
+                        Map.entry("active", "true"),
+                        Map.entry("visibility", "team"),
+                        Map.entry("review_status", "approved"),
+                        Map.entry("doc_type", "reference"),
+                        Map.entry("language", "en"),
+                        Map.entry("title", title)))
                 .build()));
         jdbcTemplate.update("""
                 INSERT INTO kb_document
@@ -340,16 +375,18 @@ class QaServiceTest {
             docs.add(Document.builder()
                     .id(chunkId)
                     .text(texts[i])
-                    .metadata(Map.of(
-                            "doc_id", docId,
-                            "product", "spring-boot",
-                            "origin", "spring.io",
-                            "authority", authority,
-                            "version", version,
-                            "active", "true",
-                            "doc_type", "reference",
-                            "language", "en",
-                            "title", title))
+                    .metadata(Map.ofEntries(
+                            Map.entry("doc_id", docId),
+                            Map.entry("product", "spring-boot"),
+                            Map.entry("origin", "spring.io"),
+                            Map.entry("authority", authority),
+                            Map.entry("version", version),
+                            Map.entry("active", "true"),
+                            Map.entry("visibility", "team"),
+                            Map.entry("review_status", "approved"),
+                            Map.entry("doc_type", "reference"),
+                            Map.entry("language", "en"),
+                            Map.entry("title", title)))
                     .build());
         }
         vectorStore.add(docs);

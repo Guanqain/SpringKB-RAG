@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import UserMenu from './UserMenu.vue'
+import NotificationBell from './NotificationBell.vue'
 
 const route = useRoute()
 const mobileOpen = ref(false)
@@ -73,6 +74,7 @@ watch(
             <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
+        <NotificationBell />
         <UserMenu />
       </div>
     </div>

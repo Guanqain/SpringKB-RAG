@@ -73,7 +73,7 @@ class KbServiceTest {
         seedDoc("d3", "vue", "vuejs.org", "official", "3.x", "guide/intro", null, "Vue Intro", "c");
         jdbcTemplate.update("UPDATE kb_document SET active = false WHERE id = ?", "d3");
 
-        KbOverview ov = kbService.overview();
+        KbOverview ov = kbService.overview(null);
 
         assertThat(ov.documentCount()).isEqualTo(2);
         assertThat(ov.productCount()).isEqualTo(2);
@@ -88,7 +88,7 @@ class KbServiceTest {
         seedDoc("d2", "spring-boot", "spring.io", "official", "4.1", "actuator/enabling", null, "Boot Old", "b");
         seedDoc("d3", "spring-boot", "stackoverflow.com", "community", "latest", "/questions/1", null, "SO Question", "c");
 
-        var roots = kbService.tree();
+        var roots = kbService.tree(null);
 
         assertThat(roots).hasSize(1);
         KbTreeNode boot = roots.get(0);
@@ -110,13 +110,13 @@ class KbServiceTest {
         seedDoc("d1", "spring-boot", "spring.io", "official", "4.2-SNAPSHOT", "actuator/enabling", null, "Boot CDS", "a");
         seedDoc("d2", "springkb", "team", "community", "team", "my-guide-abc", null, "团队手写指南", "b");
 
-        var bootDocs = kbService.docs("spring-boot", null, null, null);
+        var bootDocs = kbService.docs("spring-boot", null, null, null, null);
         assertThat(bootDocs).hasSize(1);
         assertThat(bootDocs.get(0).originalUrl())
                 .isEqualTo("https://docs.spring.io/spring-boot/4.2-SNAPSHOT/reference/actuator/enabling.html");
 
         // ugc（origin=team）无法重建原文 → originalUrl 为 null
-        var ugcDocs = kbService.docs(null, null, null, "团队");
+        var ugcDocs = kbService.docs(null, null, null, "团队", null);
         assertThat(ugcDocs).hasSize(1);
         assertThat(ugcDocs.get(0).originalUrl()).isNull();
     }
@@ -147,22 +147,22 @@ class KbServiceTest {
             seedDoc("p" + i, "spring-boot", "spring.io", "official", "4.2-SNAPSHOT", "actuator/" + i, null, "文档 " + i, "## x");
         }
 
-        var first = kbService.docsPage("spring-boot", null, null, null, 1, 2);
+        var first = kbService.docsPage("spring-boot", null, null, null, 1, 2, null);
         assertThat(first.total()).isEqualTo(5);
         assertThat(first.page()).isEqualTo(1);
         assertThat(first.size()).isEqualTo(2);
         assertThat(first.list()).hasSize(2);
 
-        var last = kbService.docsPage("spring-boot", null, null, null, 3, 2);
+        var last = kbService.docsPage("spring-boot", null, null, null, 3, 2, null);
         assertThat(last.list()).hasSize(1);
 
         // 越界页返回空列表，total 不变
-        var beyond = kbService.docsPage("spring-boot", null, null, null, 99, 2);
+        var beyond = kbService.docsPage("spring-boot", null, null, null, 99, 2, null);
         assertThat(beyond.total()).isEqualTo(5);
         assertThat(beyond.list()).isEmpty();
 
         // size 超上限钳到 100，非法 page 钳到 1
-        var clamped = kbService.docsPage(null, null, null, null, 0, 999);
+        var clamped = kbService.docsPage(null, null, null, null, 0, 999, null);
         assertThat(clamped.page()).isEqualTo(1);
         assertThat(clamped.size()).isEqualTo(100);
         assertThat(clamped.total()).isEqualTo(5);

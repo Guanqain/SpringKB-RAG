@@ -192,23 +192,24 @@ public final class HtmlToMarkdown {
         return dataLang.isEmpty() ? "" : dataLang;
     }
 
-    /** 保留代码块原始换行与缩进（Element.text() 会压平，不能用） */
+    /**
+     * 保留代码块原始换行与缩进（Element.text() 会压平，不能用）。
+     * 递归收集所有后代文本节点，兼容 chroma/prism 等把代码逐 token 包进 span 的站点。
+     */
     private static String codeText(Element pre) {
         StringBuilder sb = new StringBuilder();
-        for (Node n : pre.childNodes()) {
-            if (n instanceof TextNode tn) {
+        collectCodeText(pre, sb);
+        return sb.toString().trim();
+    }
+
+    private static void collectCodeText(Node node, StringBuilder sb) {
+        for (Node child : node.childNodes()) {
+            if (child instanceof TextNode tn) {
                 sb.append(tn.getWholeText());
-            } else if (n instanceof Element c) {
-                if ("code".equals(c.tagName())) {
-                    for (Node c2 : c.childNodes()) {
-                        if (c2 instanceof TextNode tn) {
-                            sb.append(tn.getWholeText());
-                        }
-                    }
-                }
+            } else if (child instanceof Element c) {
+                collectCodeText(c, sb);
             }
         }
-        return sb.toString().trim();
     }
 
     // ---------- 表格 ----------
