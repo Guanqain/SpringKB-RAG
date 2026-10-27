@@ -1,11 +1,16 @@
 package com.guangqian.springkb.ingestion;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 
 import com.guangqian.springkb.crawler.ImageRef;
@@ -138,7 +143,9 @@ public class IngestionService {
     public ImportResult importDocument(RawDocument doc) {
         String origin = originOf(doc);
         String authority = authorityOf(doc);
-        String docId = buildDocId(doc);
+        // docKey 规范化可能把两篇不同原文映射成同一个 id（如 python 的 genindex / genindex-_），
+        // 幂等检查按原始 doc_key 判断，因此这里还要检测 id 是否已被「别的文档」占用。
+        String docId = resolveDocId(doc);
 
         if (exists(doc, origin, authority)) {
             log.info("幂等命中，跳过导入 docId={}", docId);
@@ -312,6 +319,50 @@ public class IngestionService {
         k = k.replaceAll("-{2,}", "-");
         k = k.replaceAll("^-+|-+$", "");
         return k;
+    }
+
+    /**
+     * 解析最终 docId：优先用规范化 id；若该 id 已被「docKey 不同的另一篇文档」占用（规范化碰撞，
+     * 如 python 的 {@code genindex} 与 {@code genindex-_} 都变成 {@code genindex}），改用
+     * {@code 规范化id-原始docKey短哈希}，保证幂等键（原始 doc_key）与主键都不冲突。
+     * 已有数据的 id 保持不变，只有碰撞时才追加后缀。
+     */
+    private String resolveDocId(RawDocument doc) {
+        String base = buildDocId(doc);
+        if (!takenByOther(base, doc)) {
+            return base;
+        }
+        String hashed = base + "-" + shortHash(doc.docKey());
+        if (!takenByOther(hashed, doc)) {
+            log.warn("docId 规范化碰撞，改用哈希后缀 docKey={} base={} -> {}", doc.docKey(), base, hashed);
+            return hashed;
+        }
+        for (int i = 2; i <= 10; i++) {
+            String candidate = hashed + "-" + i;
+            if (!takenByOther(candidate, doc)) {
+                log.warn("docId 哈希后缀仍碰撞，追加序号 docKey={} -> {}", doc.docKey(), candidate);
+                return candidate;
+            }
+        }
+        throw new IllegalStateException("无法为该文档生成唯一 docId，docKey=" + doc.docKey());
+    }
+
+    /** id 是否已被「docKey 不同」的文档占用；同 docKey 的话上面的幂等检查已命中，不会走到这里。 */
+    private boolean takenByOther(String docId, RawDocument doc) {
+        List<String> keys = jdbcTemplate.query("SELECT doc_key FROM kb_document WHERE id = ?",
+                (rs, rowNum) -> rs.getString("doc_key"), docId);
+        return !keys.isEmpty() && !Objects.equals(keys.get(0), doc.docKey());
+    }
+
+    /** 原始 docKey 的稳定短哈希（SHA-256 前 10 位十六进制），仅用于消解规范化碰撞。 */
+    static String shortHash(String rawDocKey) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest((rawDocKey == null ? "" : rawDocKey).getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest).substring(0, 10);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 不可用", e);
+        }
     }
 
     private String originOf(RawDocument doc) {

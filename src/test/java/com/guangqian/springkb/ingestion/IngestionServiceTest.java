@@ -193,6 +193,41 @@ class IngestionServiceTest {
         assertThat(result.imported() + result.skipped() + result.failed()).isEqualTo(docs.size());
     }
 
+    // ---------- 6. docKey 规范化碰撞：第二篇自动加哈希后缀，两篇独立入库且幂等 ----------
+    @Test
+    void normalizationCollisionFallsBackToHashedDocId() {
+        String uid = uid();
+        // "genindex-<uid>" 与 "genindex-<uid>_" 规范化后同为 "genindex-<uid>"（python genindex / genindex-_）
+        RawDocument first = sampleDoc(uid, "genindex-" + uid);
+        RawDocument second = sampleDoc(uid, "genindex-" + uid + "_");
+        assertThat(IngestionService.buildDocId(first)).isEqualTo(IngestionService.buildDocId(second));
+
+        ImportResult r1 = ingestionService.importDocument(first);
+        ImportResult r2 = ingestionService.importDocument(second);
+
+        assertThat(r1.status()).isEqualTo(ImportResult.Status.IMPORTED);
+        assertThat(r2.status()).isEqualTo(ImportResult.Status.IMPORTED);
+        assertThat(r2.docId()).isNotEqualTo(r1.docId())
+                .startsWith(IngestionService.buildDocId(first) + "-" + IngestionService.shortHash(second.docKey()));
+
+        assertThat(count("SELECT count(*) FROM kb_document WHERE doc_key IN (?, ?)",
+                first.docKey(), second.docKey())).isEqualTo(2);
+        assertThat(count("SELECT count(*) FROM vector_store WHERE metadata ->> 'doc_id' IN (?, ?)",
+                r1.docId(), r2.docId())).isGreaterThan(0);
+
+        // 再次导入仍幂等（按原始 doc_key 命中，不会因哈希后缀重复入库）
+        assertThat(ingestionService.importDocument(second).status()).isEqualTo(ImportResult.Status.SKIPPED);
+        assertThat(count("SELECT count(*) FROM kb_document WHERE doc_key = ?", second.docKey())).isEqualTo(1);
+    }
+
+    // ---------- 7. 短哈希：确定性、长度 10、不同 docKey 不相等 ----------
+    @Test
+    void shortHashIsStableAndDistinct() {
+        assertThat(IngestionService.shortHash("genindex-abc")).isEqualTo(IngestionService.shortHash("genindex-abc"));
+        assertThat(IngestionService.shortHash("genindex-abc")).hasSize(10)
+                .isNotEqualTo(IngestionService.shortHash("genindex-abc_"));
+    }
+
     // ---------- helpers ----------
 
     private static String uid() {
@@ -205,6 +240,10 @@ class IngestionServiceTest {
     }
 
     private RawDocument sampleDoc(String uid) {
+        return sampleDoc(uid, "/guide/test-" + uid + ".html");
+    }
+
+    private RawDocument sampleDoc(String uid, String docKey) {
         String markdown = """
                 # Test Guide %s
                 ## Section Alpha %s
@@ -214,7 +253,7 @@ class IngestionServiceTest {
                 """.formatted(uid, uid, text(600), uid, text(600));
         return new RawDocument(
                 "vue", "vue", "3.x", "en", "guide", "Test Guide " + uid,
-                "https://vuejs.org/guide/test-" + uid + ".html", "/guide/test-" + uid + ".html",
+                "https://vuejs.org/guide/test-" + uid + ".html", docKey,
                 "guide", List.of(), "2026-01-01T00:00:00Z", "", markdown,
                 List.of(new ImageRef("https://img.example.com/" + uid + ".png", "Img " + uid)),
                 List.of(new HeadingNode(1, "Test Guide " + uid, "test-guide"),
