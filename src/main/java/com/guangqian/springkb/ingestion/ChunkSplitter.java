@@ -20,7 +20,8 @@ import org.springframework.stereotype.Component;
  * <ul>
  *   <li>按 {@code ^#{1,6} } 识别标题行，用标题栈维护 headingPath（同级替换、更大入栈、更小弹栈）；</li>
  *   <li>连续章节贪心累加打包，达 maxTokens 或即将超限时 flush；</li>
- *   <li>单章节超 maxTokens 时按空行二次切分（代码围栏 ``` 不允许被切开）；仍超限则硬切兜底；</li>
+ *   <li>单章节超 maxTokens 时按空行二次切分（代码围栏 ``` 优先整体保留，超过 2×maxTokens 才按预算闭合重开）；仍超限则硬切兜底；</li>
+ *   <li>任何块原则上不超过 maxTokens（围栏块 2×maxTokens），超长单行按 token 预算切分；</li>
  *   <li>尾部不足 minTokens 且前面已有块时并入上一块（不超过 maxTokens*1.25），否则独立成块；</li>
  *   <li>整篇不足 minTokens 时单块输出。</li>
  * </ul>
@@ -37,6 +38,9 @@ public class ChunkSplitter {
     private static final Pattern LINK_PATTERN = Pattern.compile("\\[([^\\]]+)\\]\\([^)]*\\)");
     private static final Pattern INLINE_CODE_PATTERN = Pattern.compile("`([^`]+)`");
     private static final Pattern TABLE_ROW_PATTERN = Pattern.compile("^\\|.*\\|\\s*$");
+    private static final String FENCE = "```";
+    /** 行尾换行符的 token 权重（与 TokenEstimator 的 4 字符/token 口径一致）。 */
+    private static final double NEWLINE_WEIGHT = 0.25;
 
     private int minTokens = 500;
     private int maxTokens = 1000;
@@ -199,32 +203,58 @@ public class ChunkSplitter {
         return out;
     }
 
-    /** 硬切兜底：按行切分，代码围栏内的行整体保留（不允许出现半截围栏）；超长单行按字符再切。 */
+    /**
+     * 硬切兜底：按行切分；围栏内的代码块最多保留到 {@link #fenceBudget()}，超过则「闭合当前围栏 + 以同样标记重开」
+     * 成对切分（避免半截围栏，也避免单个超大代码块撑爆向量模型输入上限）；超长单行按 token 预算再切。
+     */
     private List<Unit> hardSplit(Unit unit) {
         List<Unit> out = new ArrayList<>();
         StringBuilder cur = new StringBuilder();
-        int curTokens = 0;
+        double curTokens = 0;
         boolean fence = false;
+        String fenceMarker = null;
         for (String line : unit.markdown().split("\n", -1)) {
-            boolean fenceLine = line.trim().startsWith("```");
+            String trimmed = line.trim();
+            boolean fenceLine = trimmed.startsWith(FENCE);
             if (fenceLine) {
-                cur.append(line).append('\n');
-                fence = !fence;
-                curTokens += TokenEstimator.estimate(line);
-                continue;
-            }
-            if (fence) {
-                cur.append(line).append('\n');
-                curTokens += TokenEstimator.estimate(line);
-                continue;
-            }
-            List<String> parts = TokenEstimator.estimate(line) > maxTokens ? splitLongLine(line) : List.of(line);
-            for (String part : parts) {
-                int lt = TokenEstimator.estimate(part);
-                if (curTokens > 0 && curTokens + lt > maxTokens) {
+                if (fence) {
+                    // 闭合围栏：直接收尾
+                    cur.append(line).append('\n');
+                    curTokens += TokenEstimator.weightSum(line) + NEWLINE_WEIGHT;
+                    fence = false;
+                    fenceMarker = null;
+                    continue;
+                }
+                // 开启围栏：当前块已有内容且放不下这一行时先 flush
+                if (curTokens > 0 && curTokens + TokenEstimator.weightSum(line) + NEWLINE_WEIGHT > maxTokens) {
                     out.add(new Unit(cur.toString().trim(), unit.headingPath()));
                     cur.setLength(0);
                     curTokens = 0;
+                }
+                cur.append(line).append('\n');
+                curTokens += TokenEstimator.weightSum(line) + NEWLINE_WEIGHT;
+                fence = true;
+                fenceMarker = trimmed;
+                continue;
+            }
+            List<String> parts = TokenEstimator.estimate(line) > maxTokens ? splitLongLine(line) : List.of(line);
+            // 围栏块预留 1 token 给切分时补的闭合围栏，避免落块后超出硬上限
+            double budget = fence ? fenceBudget() - 1 : maxTokens;
+            for (String part : parts) {
+                // 行尾换行符同样计入，否则大量短代码行会系统性低估（每行 ~26 字符 + 换行差 25%）
+                double lt = TokenEstimator.weightSum(part) + NEWLINE_WEIGHT;
+                if (curTokens > 0 && curTokens + lt > budget) {
+                    if (fence) {
+                        // 围栏内切分：补一个闭合围栏，再以同样标记重开
+                        cur.append(FENCE).append('\n');
+                    }
+                    out.add(new Unit(cur.toString().trim(), unit.headingPath()));
+                    cur.setLength(0);
+                    curTokens = 0;
+                    if (fence) {
+                        cur.append(fenceMarker).append('\n');
+                        curTokens = TokenEstimator.weightSum(fenceMarker) + NEWLINE_WEIGHT;
+                    }
                 }
                 cur.append(part).append('\n');
                 curTokens += lt;
@@ -237,11 +267,16 @@ public class ChunkSplitter {
             out.add(unit);
         }
         for (Unit u : out) {
-            if (TokenEstimator.estimate(u.markdown()) > (int) (maxTokens * 1.25)) {
-                log.warn("硬切后块仍超出预算 tokens={}，已保留完整围栏/超长段", TokenEstimator.estimate(u.markdown()));
+            if (TokenEstimator.estimate(u.markdown()) > fenceBudget()) {
+                log.warn("硬切后块仍超出预算 tokens={}，请检查围栏/单行切分逻辑", TokenEstimator.estimate(u.markdown()));
             }
         }
         return out;
+    }
+
+    /** 围栏块 / 单块硬上限：2×maxTokens。超出则强制切分，保证远低于向量模型单条输入上限。 */
+    private int fenceBudget() {
+        return maxTokens * 2;
     }
 
     /** 贪心打包：逐单元累加，超限且已达 minTokens 时 flush；块路径取块首单元的快照。 */
@@ -252,7 +287,10 @@ public class ChunkSplitter {
         int accTokens = 0;
         for (Unit u : units) {
             int ut = TokenEstimator.estimate(u.markdown());
-            if (accTokens > 0 && accTokens + ut > maxTokens && accTokens >= minTokens) {
+            boolean overBudget = accTokens > 0 && accTokens + ut > maxTokens && accTokens >= minTokens;
+            // 单块硬上限：避免小单元 + 围栏单元合成远超预算的块
+            boolean overHardCap = accTokens > 0 && accTokens + ut > fenceBudget();
+            if (overBudget || overHardCap) {
                 chunks.add(buildChunk(curMd, blockPath != null ? blockPath : fallbackPath, doc));
                 curMd.setLength(0);
                 accTokens = 0;
@@ -384,15 +422,26 @@ public class ChunkSplitter {
         return paragraphs;
     }
 
-    /** 超长单行按 maxTokens*4 字符硬切子串（兜底，可能切断单词但保证围栏外的可切性）。 */
+    /**
+     * 超长单行按 token 预算硬切（兜底，可能切断单词但保证可切性）。
+     * 按字符权重累加：CJK 1 字符 ≈ 1 token，其余 4 字符 ≈ 1 token；每段 ≤ maxTokens。
+     */
     private List<String> splitLongLine(String line) {
-        int chunkChars = maxTokens * 4;
         List<String> parts = new ArrayList<>();
         int idx = 0;
         while (idx < line.length()) {
-            int end = Math.min(line.length(), idx + chunkChars);
-            parts.add(line.substring(idx, end));
-            idx = end;
+            int start = idx;
+            double acc = 0;
+            while (idx < line.length()) {
+                int codePoint = line.codePointAt(idx);
+                double w = TokenEstimator.weight(codePoint);
+                if (idx > start && acc + w > maxTokens) {
+                    break;
+                }
+                acc += w;
+                idx += Character.charCount(codePoint);
+            }
+            parts.add(line.substring(start, idx));
         }
         return parts;
     }

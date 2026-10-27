@@ -206,6 +206,82 @@ class ChunkSplitterTest {
         assertThat(text).contains("Windows path docs");
     }
 
+    // ---------- 9. token 估算：CJK 按 1 token/字符，ASCII 按 4 字符/token ----------
+    @Test
+    void estimatesCjkAndAsciiTokenWeights() {
+        assertThat(TokenEstimator.estimate("中".repeat(100))).isEqualTo(100);
+        assertThat(TokenEstimator.estimate("abcd")).isEqualTo(1);
+        // 50 个汉字 + 50 个 ASCII ≈ 50 + 12.5 → 63
+        assertThat(TokenEstimator.estimate("中a".repeat(50))).isEqualTo(63);
+        assertThat(TokenEstimator.estimate("")).isZero();
+        assertThat(TokenEstimator.estimate(null)).isZero();
+    }
+
+    // ---------- 10. 中文超长章节：按 token 预算切分，不再按 4 字符/token 低估 ----------
+    @Test
+    void splitsLongChineseSectionByTokenBudget() {
+        String zh = "中文文档内容用于验证分块预算与中文token估算。".repeat(400); // 1 万字符 → 约 1 万 token
+        RawDocument doc = doc(
+                "# 指南\n\n## 长章节\n\n" + zh + "\n",
+                List.of(),
+                List.of(
+                        new HeadingNode(1, "指南", "guide"),
+                        new HeadingNode(2, "长章节", "long-section")));
+
+        List<TextChunk> chunks = splitter.split(doc);
+
+        assertThat(chunks.size()).isGreaterThan(1);
+        for (TextChunk chunk : chunks) {
+            assertThat(chunk.tokenCount())
+                    .as("中文块 tokenCount 应按字符数估算且不超预算")
+                    .isBetween(1, 1250);
+        }
+    }
+
+    // ---------- 11. 超大代码围栏：超过 2×maxTokens 时成对闭合重开切分 ----------
+    @Test
+    void splitsOversizedCodeFenceWithBalancedMarkers() {
+        String code = "```java\n" + "int value = compute(1, 2);\n".repeat(2000) + "```";
+        RawDocument doc = doc(
+                "# Guide\n\n## Code Section\n\n" + code + "\n",
+                List.of(),
+                List.of(
+                        new HeadingNode(1, "Guide", "guide"),
+                        new HeadingNode(2, "Code Section", "code-section")));
+
+        List<TextChunk> chunks = splitter.split(doc);
+
+        assertThat(chunks.size()).isGreaterThan(1);
+        for (TextChunk chunk : chunks) {
+            String md = chunk.contentMarkdown();
+            long fences = md.lines().filter(l -> l.trim().startsWith("```")).count();
+            assertThat(fences % 2).as("切分后的每块围栏必须成对").isZero();
+            assertThat(chunk.tokenCount())
+                    .as("单块不得超过硬上限 2×maxTokens")
+                    .isLessThanOrEqualTo(2000);
+            assertThat(md).doesNotContain(code);
+        }
+    }
+
+    // ---------- 12. 无换行的超长单行（中文）：按 token 预算切分 ----------
+    @Test
+    void splitsVeryLongUnbrokenChineseLine() {
+        String oneLine = "单行超长中文内容".repeat(600); // 4800 字符且无换行
+        RawDocument doc = doc(
+                "# 指南\n\n## 长行\n\n" + oneLine + "\n",
+                List.of(),
+                List.of(
+                        new HeadingNode(1, "指南", "guide"),
+                        new HeadingNode(2, "长行", "long-line")));
+
+        List<TextChunk> chunks = splitter.split(doc);
+
+        assertThat(chunks.size()).isGreaterThan(1);
+        for (TextChunk chunk : chunks) {
+            assertThat(chunk.tokenCount()).isLessThanOrEqualTo(1250);
+        }
+    }
+
     // ---------- helpers ----------
 
     /** 构造约 tokens 个 token 的纯文本（1 token ≈ 4 字符）。 */
