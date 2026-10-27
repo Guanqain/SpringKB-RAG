@@ -7,8 +7,11 @@ import java.nio.file.Path;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +22,7 @@ import com.guangqian.springkb.crawler.HtmlToMarkdown;
 import com.guangqian.springkb.crawler.ImageRef;
 import com.guangqian.springkb.crawler.RawDocument;
 import com.guangqian.springkb.dto.AdminImportResult;
-import com.guangqian.springkb.dto.AdminStats;
+import com.guangqian.springkb.dto.AdminOverview;
 import com.guangqian.springkb.dto.CategoryCreateRequest;
 import com.guangqian.springkb.dto.CategoryDto;
 import com.guangqian.springkb.dto.DocumentDto;
@@ -104,34 +107,362 @@ public class AdminService {
         return new PageResult<>(list, total, p, s);
     }
 
-    /** 概览聚合：一条 GROUP BY ROLLUP 同时得到全局指标与按 product 的分布，避免拉取文档行。 */
-    public AdminStats stats() {
-        long[] totals = new long[6];
-        List<AdminStats.ProductCount> products = new ArrayList<>();
-        jdbcTemplate.query("""
-                SELECT product, GROUPING(product) AS total_group,
-                       count(*) AS cnt,
-                       COALESCE(sum(chunk_count), 0) AS chunks,
-                       count(*) FILTER (WHERE active) AS active_cnt,
-                       count(*) FILTER (WHERE review_status = 'pending') AS pending_cnt,
-                       count(*) FILTER (WHERE authority = 'official') AS official_cnt,
-                       count(*) FILTER (WHERE authority = 'community') AS community_cnt
+    /** 文档总数 / 启用状态 / chunk / 新鲜度 / 可见性 / 新增文档，一条聚合 SQL。 */
+    private static final String CONTENT_AGG_SQL = """
+            SELECT count(*) AS total,
+                   count(*) FILTER (WHERE active) AS active,
+                   count(*) FILTER (WHERE NOT active) AS inactive,
+                   COALESCE(sum(chunk_count), 0) AS chunks,
+                   COALESCE(avg(chunk_count), 0) AS avg_chunks,
+                   count(*) FILTER (WHERE chunk_count = 0) AS empty_chunks,
+                   count(*) FILTER (WHERE visibility = 'team') AS team_docs,
+                   count(*) FILTER (WHERE visibility = 'private') AS private_docs,
+                   count(*) FILTER (WHERE last_modified >= now() - interval '30 days') AS fresh_30,
+                   count(*) FILTER (WHERE last_modified < now() - interval '30 days'
+                                     AND last_modified >= now() - interval '180 days') AS fresh_180,
+                   count(*) FILTER (WHERE last_modified < now() - interval '180 days'
+                                     AND last_modified >= now() - interval '365 days') AS fresh_365,
+                   count(*) FILTER (WHERE last_modified < now() - interval '365 days') AS fresh_old,
+                   count(*) FILTER (WHERE last_modified IS NULL) AS fresh_unknown,
+                   COALESCE(avg(EXTRACT(EPOCH FROM (now() - COALESCE(last_modified, fetched_at))) / 86400.0), 0)
+                       AS avg_age_days,
+                   count(*) FILTER (WHERE created_at::date = current_date) AS today_new,
+                   count(*) FILTER (WHERE created_at >= now() - CAST(? AS int) * interval '1 day') AS window_new,
+                   count(*) FILTER (WHERE created_at >= now() - CAST(? AS int) * interval '1 day'
+                                     AND created_at < now() - CAST(? AS int) * interval '1 day')
+                       AS prev_window_new
+            FROM kb_document
+            """;
+
+    /**
+     * 概览聚合（GET /api/admin/overview）：days 仅接受 7/30，其余按 7 处理。
+     * 全部指标由聚合 / JOIN SQL 得出，不把文档行拉进 Java 遍历。
+     */
+    public AdminOverview overview(int days) {
+        int windowDays = (days == 7 || days == 30) ? days : 7;
+        int previousDays = windowDays * 2;
+
+        ContentAgg content = jdbcTemplate.queryForObject(CONTENT_AGG_SQL, (rs, rowNum) -> new ContentAgg(
+                rs.getLong("total"), rs.getLong("active"), rs.getLong("inactive"),
+                rs.getLong("chunks"), rs.getDouble("avg_chunks"), rs.getLong("empty_chunks"),
+                rs.getLong("team_docs"), rs.getLong("private_docs"),
+                rs.getLong("fresh_30"), rs.getLong("fresh_180"), rs.getLong("fresh_365"),
+                rs.getLong("fresh_old"), rs.getLong("fresh_unknown"),
+                rs.getDouble("avg_age_days"), rs.getLong("today_new"),
+                rs.getLong("window_new"), rs.getLong("prev_window_new")),
+                windowDays, previousDays, windowDays);
+
+        Map<String, List<AdminOverview.ProductSlice>> groups = loadGroupSlices();
+        TopSlice products = topSlice(groups.getOrDefault("product", List.of()));
+        TopSlice origins = topSlice(groups.getOrDefault("origin", List.of()));
+        TopSlice versions = topSlice(groups.getOrDefault("version", List.of()));
+
+        GovernanceAgg review = jdbcTemplate.queryForObject("""
+                SELECT count(*) FILTER (WHERE review_status = 'approved') AS approved,
+                       count(*) FILTER (WHERE review_status = 'pending') AS pending,
+                       count(*) FILTER (WHERE review_status = 'rejected') AS rejected,
+                       COALESCE(avg(EXTRACT(EPOCH FROM (reviewed_at - created_at)) / 3600.0)
+                                FILTER (WHERE reviewed_at IS NOT NULL), 0) AS avg_review_hours,
+                       COALESCE(max(EXTRACT(EPOCH FROM (now() - updated_at)) / 86400.0)
+                                FILTER (WHERE review_status = 'pending'), 0) AS pending_oldest_days,
+                       count(*) FILTER (WHERE review_status = 'rejected'
+                                         AND updated_at < now() - interval '7 days') AS rejected_stale
                 FROM kb_document
-                GROUP BY ROLLUP (product)
-                ORDER BY total_group DESC, cnt DESC, product
+                """, (rs, rowNum) -> new GovernanceAgg(
+                rs.getLong("approved"), rs.getLong("pending"), rs.getLong("rejected"),
+                rs.getDouble("avg_review_hours"), rs.getDouble("pending_oldest_days"),
+                rs.getLong("rejected_stale")));
+
+        ScanAgg scan = jdbcTemplate.queryForObject("""
+                SELECT (SELECT count(*) FROM kb_notification WHERE NOT read) AS unread,
+                       count(*) FILTER (WHERE created_at >= now() - CAST(? AS int) * interval '1 day')
+                           AS blocks,
+                       count(DISTINCT doc_title)
+                           FILTER (WHERE created_at >= now() - CAST(? AS int) * interval '1 day')
+                           AS blocked_titles,
+                       COALESCE(sum(hit_count)
+                                FILTER (WHERE created_at >= now() - CAST(? AS int) * interval '1 day'), 0)
+                           AS hits,
+                       count(*) FILTER (WHERE created_at >= now() - CAST(? AS int) * interval '1 day'
+                                         AND created_at < now() - CAST(? AS int) * interval '1 day')
+                           AS prev_blocks
+                FROM kb_scan_log
+                WHERE created_at >= now() - CAST(? AS int) * interval '1 day'
+                """, (rs, rowNum) -> new ScanAgg(
+                rs.getLong("unread"), rs.getLong("blocks"), rs.getLong("blocked_titles"),
+                rs.getLong("prev_blocks"), rs.getLong("hits")),
+                windowDays, windowDays, windowDays, windowDays, windowDays, previousDays);
+
+        List<AdminOverview.RuleHit> rules = new ArrayList<>();
+        List<AdminOverview.ActionSlice> actions = new ArrayList<>();
+        jdbcTemplate.query("""
+                SELECT dim, label, cnt FROM (
+                    SELECT 'rule' AS dim, rule_type AS label, count(*) AS cnt
+                    FROM kb_scan_log
+                    WHERE created_at >= now() - CAST(? AS int) * interval '1 day'
+                    GROUP BY rule_type
+                    UNION ALL
+                    SELECT 'action', action, count(*)
+                    FROM kb_scan_log
+                    WHERE created_at >= now() - CAST(? AS int) * interval '1 day'
+                    GROUP BY action
+                ) g
+                ORDER BY dim, cnt DESC, label
                 """, (RowCallbackHandler) rs -> {
-            if (rs.getInt("total_group") == 1) {
-                totals[0] = rs.getLong("cnt");
-                totals[1] = rs.getLong("active_cnt");
-                totals[2] = rs.getLong("pending_cnt");
-                totals[3] = rs.getLong("chunks");
-                totals[4] = rs.getLong("official_cnt");
-                totals[5] = rs.getLong("community_cnt");
-            } else {
-                products.add(new AdminStats.ProductCount(rs.getString("product"), rs.getLong("cnt")));
+            if ("rule".equals(rs.getString("dim")) && rules.size() < 5) {
+                rules.add(new AdminOverview.RuleHit(rs.getString("label"), rs.getLong("cnt")));
+            } else if ("action".equals(rs.getString("dim"))) {
+                actions.add(new AdminOverview.ActionSlice(rs.getString("label"), rs.getLong("cnt")));
             }
-        });
-        return new AdminStats(totals[0], totals[1], totals[2], totals[3], totals[4], totals[5], products);
+        }, windowDays, windowDays);
+
+        QaAgg qa = jdbcTemplate.queryForObject("""
+                SELECT (SELECT count(*) FROM kb_conversation) AS conversations,
+                       (SELECT count(*) FROM kb_message) AS messages,
+                       (SELECT count(*) FROM kb_message
+                         WHERE created_at >= now() - CAST(? AS int) * interval '1 day') AS window_qa,
+                       (SELECT count(*) FROM kb_message
+                         WHERE created_at >= now() - CAST(? AS int) * interval '1 day'
+                           AND created_at < now() - CAST(? AS int) * interval '1 day') AS prev_qa,
+                       count(*) FILTER (WHERE found) AS window_found,
+                       COALESCE(avg(CASE WHEN jsonb_typeof(sources) = 'array'
+                                         THEN jsonb_array_length(sources) ELSE 0 END), 0) AS avg_sources,
+                       (SELECT count(DISTINCT c.username)
+                          FROM kb_message m JOIN kb_conversation c ON c.id = m.conversation_id
+                         WHERE m.created_at >= now() - CAST(? AS int) * interval '1 day') AS active_askers
+                FROM kb_message
+                WHERE created_at >= now() - CAST(? AS int) * interval '1 day'
+                """, (rs, rowNum) -> new QaAgg(
+                rs.getLong("conversations"), rs.getLong("messages"), rs.getLong("window_qa"),
+                rs.getLong("prev_qa"), rs.getLong("window_found"), rs.getDouble("avg_sources"),
+                rs.getLong("active_askers")),
+                windowDays, previousDays, windowDays, windowDays, windowDays);
+
+        List<AdminOverview.BlindSpot> blindspots = jdbcTemplate.query("""
+                SELECT left(question, 60) AS q, count(*) AS cnt
+                FROM kb_message
+                WHERE found = false AND created_at >= now() - CAST(? AS int) * interval '1 day'
+                GROUP BY left(question, 60)
+                ORDER BY cnt DESC, q
+                LIMIT 5
+                """, (rs, rowNum) -> new AdminOverview.BlindSpot(rs.getString("q"), rs.getLong("cnt")),
+                windowDays);
+
+        AdminOverview.TrendSeries trend = loadTrend(windowDays);
+
+        List<UserRoleAgg> roleRows = jdbcTemplate.query("""
+                SELECT role, count(*) AS cnt,
+                       count(*) FILTER (WHERE created_at >= now() - CAST(? AS int) * interval '1 day')
+                           AS new_cnt,
+                       count(*) FILTER (WHERE created_at >= now() - CAST(? AS int) * interval '1 day'
+                                         AND created_at < now() - CAST(? AS int) * interval '1 day')
+                           AS prev_new_cnt
+                FROM kb_user
+                GROUP BY role
+                ORDER BY cnt DESC, role
+                """, (rs, rowNum) -> new UserRoleAgg(
+                rs.getString("role"), rs.getLong("cnt"), rs.getLong("new_cnt"),
+                rs.getLong("prev_new_cnt")), windowDays, previousDays, windowDays);
+        long totalUsers = roleRows.stream().mapToLong(UserRoleAgg::count).sum();
+        long admins = roleRows.stream().filter(r -> AuthService.ROLE_ADMIN.equals(r.role()))
+                .mapToLong(UserRoleAgg::count).sum();
+        long members = roleRows.stream().filter(r -> AuthService.ROLE_MEMBER.equals(r.role()))
+                .mapToLong(UserRoleAgg::count).sum();
+        long newUsers = roleRows.stream().mapToLong(UserRoleAgg::newCount).sum();
+        long prevNewUsers = roleRows.stream().mapToLong(UserRoleAgg::prevNewCount).sum();
+        List<AdminOverview.RoleSlice> roles = roleRows.stream()
+                .map(r -> new AdminOverview.RoleSlice(r.role(), r.count()))
+                .toList();
+
+        Long activeUsers = jdbcTemplate.queryForObject("""
+                SELECT count(*) FROM (
+                    SELECT c.username
+                    FROM kb_message m JOIN kb_conversation c ON c.id = m.conversation_id
+                    WHERE m.created_at >= now() - CAST(? AS int) * interval '1 day'
+                    UNION
+                    SELECT author FROM kb_document
+                    WHERE author IS NOT NULL AND created_at >= now() - CAST(? AS int) * interval '1 day'
+                ) u
+                """, Long.class, windowDays, windowDays);
+
+        Long prevActiveUsers = jdbcTemplate.queryForObject("""
+                SELECT count(*) FROM (
+                    SELECT c.username
+                    FROM kb_message m JOIN kb_conversation c ON c.id = m.conversation_id
+                    WHERE m.created_at >= now() - CAST(? AS int) * interval '1 day'
+                      AND m.created_at < now() - CAST(? AS int) * interval '1 day'
+                    UNION
+                    SELECT author FROM kb_document
+                    WHERE author IS NOT NULL
+                      AND created_at >= now() - CAST(? AS int) * interval '1 day'
+                      AND created_at < now() - CAST(? AS int) * interval '1 day'
+                ) u
+                """, Long.class, previousDays, windowDays, previousDays, windowDays);
+
+        List<AdminOverview.ContributorSlice> contributors = jdbcTemplate.query("""
+                SELECT author AS username, count(*) AS cnt
+                FROM kb_document
+                WHERE author IS NOT NULL
+                GROUP BY author
+                ORDER BY cnt DESC, author
+                LIMIT 5
+                """, (rs, rowNum) -> new AdminOverview.ContributorSlice(rs.getString("username"), rs.getLong("cnt")));
+
+        EngagementAgg engagement = jdbcTemplate.queryForObject("""
+                SELECT (SELECT count(*) FROM kb_doc_like) AS likes,
+                       (SELECT count(*) FROM kb_doc_favorite) AS favorites
+                """, (rs, rowNum) -> new EngagementAgg(rs.getLong("likes"), rs.getLong("favorites")));
+        List<AdminOverview.FavoriteSlice> topFavorites = jdbcTemplate.query("""
+                SELECT f.doc_id, COALESCE(d.title, '') AS title, count(*) AS cnt
+                FROM kb_doc_favorite f LEFT JOIN kb_document d ON d.id = f.doc_id
+                GROUP BY f.doc_id, d.title
+                ORDER BY cnt DESC, f.doc_id
+                LIMIT 5
+                """, (rs, rowNum) -> new AdminOverview.FavoriteSlice(
+                rs.getString("doc_id"), rs.getString("title"), rs.getLong("cnt")));
+
+        HealthAgg health = jdbcTemplate.queryForObject("""
+                SELECT (SELECT count(*) FROM vector_store) AS vector_rows,
+                       pg_database_size(current_database()) AS db_size,
+                       (SELECT max(fetched_at) FROM kb_document) AS last_ingested,
+                       (SELECT max(created_at) FROM kb_scan_log) AS last_scan,
+                       (SELECT max(created_at) FROM kb_message) AS last_qa
+                """, (rs, rowNum) -> new HealthAgg(
+                rs.getLong("vector_rows"), rs.getLong("db_size"),
+                rs.getObject("last_ingested", OffsetDateTime.class),
+                rs.getObject("last_scan", OffsetDateTime.class),
+                rs.getObject("last_qa", OffsetDateTime.class)));
+
+        double activeRate = ratio(content.active(), content.total());
+        double approvalRate = ratio(review.approved(), review.approved() + review.rejected());
+        double foundRate = ratio(qa.windowFound(), qa.windowQa());
+        double noAnswerRate = qa.windowQa() == 0 ? 0
+                : (qa.windowQa() - qa.windowFound()) / (double) qa.windowQa();
+        double coverageRate = content.chunks() == 0 ? 0 : health.vectorRows() / (double) content.chunks();
+        double approvedPct = ratio(review.approved(), content.total());
+        double pendingPct = ratio(review.pending(), content.total());
+        double rejectedPct = ratio(review.rejected(), content.total());
+        long blindspotCount = qa.windowQa() - qa.windowFound();
+
+        AdminOverview.ContentStats contentStats = new AdminOverview.ContentStats(
+                content.total(), content.active(), content.inactive(),
+                content.chunks(), content.avgChunks(), content.emptyChunks(),
+                products.top(), products.other(),
+                origins.top(), origins.other(),
+                List.copyOf(groups.getOrDefault("doc_type", List.of())),
+                List.copyOf(groups.getOrDefault("language", List.of())),
+                versions.top(), versions.other(),
+                new AdminOverview.VisibilityStats(content.teamDocs(), content.privateDocs()),
+                new AdminOverview.FreshnessStats(content.fresh30(), content.fresh180(),
+                        content.fresh365(), content.freshOld(), content.freshUnknown()),
+                content.avgAgeDays(), content.todayNew(), content.windowNew(), content.prevWindowNew());
+
+        AdminOverview.GovernanceStats governanceStats = new AdminOverview.GovernanceStats(
+                List.of(new AdminOverview.ReviewStatusSlice("approved", review.approved(), approvedPct),
+                        new AdminOverview.ReviewStatusSlice("pending", review.pending(), pendingPct),
+                        new AdminOverview.ReviewStatusSlice("rejected", review.rejected(), rejectedPct)),
+                approvalRate, review.avgReviewHours(), review.pendingOldestDays(), review.rejectedStale(),
+                new AdminOverview.ScanStats(scan.blocks(), scan.blockedTitles(), scan.prevBlocks(), scan.hits(),
+                        rules, actions),
+                scan.unread());
+
+        AdminOverview.QaStats qaStats = new AdminOverview.QaStats(
+                qa.conversations(), qa.messages(), qa.windowQa(), qa.prevQa(),
+                foundRate, noAnswerRate, qa.avgSources(), qa.activeAskers(), blindspots);
+
+        AdminOverview.UserStats userStats = new AdminOverview.UserStats(
+                totalUsers, admins, members, newUsers, prevNewUsers,
+                activeUsers == null ? 0 : activeUsers,
+                prevActiveUsers == null ? 0 : prevActiveUsers, contributors, roles);
+
+        AdminOverview.EngagementStats engagementStats = new AdminOverview.EngagementStats(
+                engagement.likes(), engagement.favorites(), topFavorites);
+
+        AdminOverview.HealthStats healthStats = new AdminOverview.HealthStats(
+                health.vectorRows(), coverageRate, health.dbSize(),
+                iso(health.lastIngested()), iso(health.lastScan()), iso(health.lastQa()));
+
+        AdminOverview.Cards cards = new AdminOverview.Cards(
+                content.total(), content.chunks(), activeRate, review.pending(),
+                qa.windowQa(), foundRate, totalUsers, content.windowNew());
+
+        AdminOverview.TodoSummary todos = new AdminOverview.TodoSummary(
+                review.pending(), review.rejectedStale(), scan.blocks(), blindspotCount);
+
+        return new AdminOverview(cards,
+                new AdminOverview.Sections(contentStats, governanceStats, qaStats, userStats,
+                        engagementStats, healthStats),
+                trend, todos,
+                new AdminOverview.Meta(windowDays, OffsetDateTime.now().withNano(0).toString()));
+    }
+
+    /** 五个维度（product / origin / doc_type / language / version）的分组计数，SQL 已按计数降序。 */
+    private Map<String, List<AdminOverview.ProductSlice>> loadGroupSlices() {
+        Map<String, List<AdminOverview.ProductSlice>> groups = new LinkedHashMap<>();
+        jdbcTemplate.query("""
+                SELECT dim, label, cnt FROM (
+                    SELECT 'product' AS dim, product AS label, count(*) AS cnt FROM kb_document GROUP BY product
+                    UNION ALL
+                    SELECT 'origin', origin, count(*) FROM kb_document GROUP BY origin
+                    UNION ALL
+                    SELECT 'doc_type', doc_type, count(*) FROM kb_document GROUP BY doc_type
+                    UNION ALL
+                    SELECT 'language', language, count(*) FROM kb_document GROUP BY language
+                    UNION ALL
+                    SELECT 'version', version, count(*) FROM kb_document GROUP BY version
+                ) g
+                ORDER BY dim, cnt DESC, label
+                """, (RowCallbackHandler) rs -> groups
+                .computeIfAbsent(rs.getString("dim"), k -> new ArrayList<>())
+                .add(new AdminOverview.ProductSlice(rs.getString("label"), rs.getLong("cnt"))));
+        return groups;
+    }
+
+    /** 前 8 项明细 + 其余项数与文档数之和。 */
+    private static TopSlice topSlice(List<AdminOverview.ProductSlice> rows) {
+        if (rows.size() <= 8) {
+            return new TopSlice(List.copyOf(rows), new AdminOverview.OtherBucket(0, 0));
+        }
+        List<AdminOverview.ProductSlice> top = List.copyOf(rows.subList(0, 8));
+        List<AdminOverview.ProductSlice> rest = rows.subList(8, rows.size());
+        long total = rest.stream().mapToLong(AdminOverview.ProductSlice::count).sum();
+        return new TopSlice(top, new AdminOverview.OtherBucket(rest.size(), total));
+    }
+
+    /** 近 N 天趋势：按 date_trunc('day') 聚合两张表，Java 侧用 LocalDate 补齐缺失日期为 0。 */
+    private AdminOverview.TrendSeries loadTrend(int days) {
+        LocalDate today = jdbcTemplate.queryForObject("SELECT current_date", LocalDate.class);
+        Map<LocalDate, Long> docsByDay = new HashMap<>();
+        Map<LocalDate, Long> qaByDay = new HashMap<>();
+        jdbcTemplate.query("""
+                SELECT date_trunc('day', created_at)::date AS d, count(*) AS cnt
+                FROM kb_document
+                WHERE created_at >= current_date - CAST(? AS int) * interval '1 day'
+                GROUP BY date_trunc('day', created_at)::date
+                """, (RowCallbackHandler) rs -> docsByDay.put(rs.getDate("d").toLocalDate(), rs.getLong("cnt")),
+                days - 1);
+        jdbcTemplate.query("""
+                SELECT date_trunc('day', created_at)::date AS d, count(*) AS cnt
+                FROM kb_message
+                WHERE created_at >= current_date - CAST(? AS int) * interval '1 day'
+                GROUP BY date_trunc('day', created_at)::date
+                """, (RowCallbackHandler) rs -> qaByDay.put(rs.getDate("d").toLocalDate(), rs.getLong("cnt")),
+                days - 1);
+        List<AdminOverview.TrendPoint> points = new ArrayList<>(days);
+        for (int i = days - 1; i >= 0; i--) {
+            LocalDate date = today == null ? LocalDate.now().minusDays(i) : today.minusDays(i);
+            points.add(new AdminOverview.TrendPoint(date.toString(),
+                    docsByDay.getOrDefault(date, 0L), qaByDay.getOrDefault(date, 0L)));
+        }
+        return new AdminOverview.TrendSeries(days, points);
+    }
+
+    private static double ratio(long numerator, long denominator) {
+        return denominator == 0 ? 0 : numerator / (double) denominator;
+    }
+
+    private static String iso(OffsetDateTime time) {
+        return time == null ? null : time.withNano(0).toString();
     }
 
     /** 构造 WHERE 子句：参数均以占位符绑定（无 SQL 注入面）；keyword 走 ILIKE 并转义 %/_。 */
@@ -533,6 +864,38 @@ public class AdminService {
         }
         userRepository.updateRole(id, role);
         return new MemberDto(target.id(), target.username(), target.email(), role, target.createdAt());
+    }
+
+    // ---------- helpers（概览聚合的中间结果） ----------
+
+    private record ContentAgg(long total, long active, long inactive, long chunks, double avgChunks,
+                              long emptyChunks, long teamDocs, long privateDocs, long fresh30,
+                              long fresh180, long fresh365, long freshOld, long freshUnknown,
+                              double avgAgeDays, long todayNew, long windowNew, long prevWindowNew) {
+    }
+
+    private record GovernanceAgg(long approved, long pending, long rejected, double avgReviewHours,
+                                 double pendingOldestDays, long rejectedStale) {
+    }
+
+    private record ScanAgg(long unread, long blocks, long blockedTitles, long prevBlocks, long hits) {
+    }
+
+    private record QaAgg(long conversations, long messages, long windowQa, long prevQa,
+                         long windowFound, double avgSources, long activeAskers) {
+    }
+
+    private record UserRoleAgg(String role, long count, long newCount, long prevNewCount) {
+    }
+
+    private record EngagementAgg(long likes, long favorites) {
+    }
+
+    private record HealthAgg(long vectorRows, long dbSize, OffsetDateTime lastIngested,
+                             OffsetDateTime lastScan, OffsetDateTime lastQa) {
+    }
+
+    private record TopSlice(List<AdminOverview.ProductSlice> top, AdminOverview.OtherBucket other) {
     }
 
     // ---------- helpers ----------

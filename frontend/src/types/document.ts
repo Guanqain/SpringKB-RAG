@@ -72,20 +72,205 @@ export interface DocumentQuery extends PageQuery {
   keyword?: string
 }
 
-/** GET /api/admin/stats 概览聚合（按 product 的分布 + 全局指标） */
-export interface AdminProductCount {
+/** GET /api/admin/overview 全系统状态概览（只含聚合值） */
+export interface AdminOverview {
+  cards: Cards
+  sections: Sections
+  trend: TrendSeries
+  todos: TodoSummary
+  meta: Meta
+}
+
+export interface Cards {
+  totalDocs: number
+  chunks: number
+  activeRate: number
+  pendingReview: number
+  windowQa: number
+  foundRate: number
+  users: number
+  windowNewDocs: number
+}
+
+export interface Sections {
+  content: ContentStats
+  governance: GovernanceStats
+  qa: QaStats
+  users: UserStats
+  engagement: EngagementStats
+  health: HealthStats
+}
+
+export interface ContentStats {
+  totalDocs: number
+  activeDocs: number
+  inactiveDocs: number
+  chunks: number
+  avgChunksPerDoc: number
+  emptyChunkDocs: number
+  products: ProductSlice[]
+  otherProducts: OtherBucket
+  origins: ProductSlice[]
+  otherOrigins: OtherBucket
+  docTypes: ProductSlice[]
+  languages: ProductSlice[]
+  versions: ProductSlice[]
+  otherVersions: OtherBucket
+  visibility: VisibilityStats
+  freshness: FreshnessStats
+  avgAgeDays: number
+  todayNewDocs: number
+  windowNewDocs: number
+  prevWindowNewDocs: number
+}
+
+/** product 字段承载维度值：product / origin / doc_type / language / version */
+export interface ProductSlice {
   product: string
   count: number
 }
 
-export interface AdminStats {
+/** Top N 之外：count=剩余项数，total=剩余文档数之和 */
+export interface OtherBucket {
+  count: number
   total: number
-  active: number
-  pending: number
-  chunks: number
-  official: number
-  community: number
-  products: AdminProductCount[]
+}
+
+export interface VisibilityStats {
+  team: number
+  'private': number
+}
+
+export interface FreshnessStats {
+  within30Days: number
+  days31To180: number
+  days181To365: number
+  over365Days: number
+  unknown: number
+}
+
+export interface ReviewStatusSlice {
+  status: string
+  count: number
+  /** 0~1 占比 */
+  pct: number
+}
+
+export interface ScanStats {
+  windowBlocks: number
+  blockedTitles: number
+  prevWindowBlocks: number
+  hits: number
+  byRule: RuleHit[]
+  byAction: ActionSlice[]
+}
+
+export interface RuleHit {
+  ruleType: string
+  count: number
+}
+
+export interface ActionSlice {
+  action: string
+  count: number
+}
+
+export interface GovernanceStats {
+  reviewStatus: ReviewStatusSlice[]
+  /** 0~1 通过率 */
+  approvalRate: number
+  avgReviewHours: number
+  pendingOldestDays: number
+  rejectedStale: number
+  scan: ScanStats
+  notificationsUnread: number
+}
+
+export interface QaStats {
+  conversations: number
+  messages: number
+  windowQa: number
+  prevWindowQa: number
+  /** 0~1 命中率 */
+  foundRate: number
+  /** 0~1 未命中率 */
+  noAnswerRate: number
+  avgSources: number
+  activeAskers: number
+  blindspotsTop: BlindSpot[]
+}
+
+/** 知识盲区：只含问题原文（截断 60 字）与次数，不含用户名 */
+export interface BlindSpot {
+  question: string
+  count: number
+}
+
+export interface TrendSeries {
+  days: number
+  points: TrendPoint[]
+}
+
+export interface TrendPoint {
+  date: string
+  newDocs: number
+  qaCount: number
+}
+
+export interface UserStats {
+  total: number
+  admins: number
+  members: number
+  newInWindow: number
+  prevNewInWindow: number
+  activeInWindow: number
+  prevActiveInWindow: number
+  topContributors: ContributorSlice[]
+  roles: RoleSlice[]
+}
+
+export interface ContributorSlice {
+  username: string
+  count: number
+}
+
+export interface RoleSlice {
+  role: string
+  count: number
+}
+
+export interface EngagementStats {
+  likes: number
+  favorites: number
+  topFavorites: FavoriteSlice[]
+}
+
+export interface FavoriteSlice {
+  docId: string
+  title: string
+  count: number
+}
+
+export interface HealthStats {
+  vectorRows: number
+  /** 0~1 向量覆盖率 */
+  coverageRate: number
+  dbSizeBytes: number
+  lastIngestedAt: string | null
+  lastScanAt: string | null
+  lastQaAt: string | null
+}
+
+export interface TodoSummary {
+  pendingReview: number
+  rejectedStale: number
+  scanBlocks: number
+  blindspots: number
+}
+
+export interface Meta {
+  windowDays: number
+  generatedAt: string
 }
 
 /** GET /api/admin/reviews 查询参数（status 默认 pending） */

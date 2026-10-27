@@ -5,7 +5,7 @@ import java.util.List;
 import com.guangqian.springkb.common.ApiResponse;
 import com.guangqian.springkb.common.NotFoundException;
 import com.guangqian.springkb.dto.ActiveRequest;
-import com.guangqian.springkb.dto.AdminStats;
+import com.guangqian.springkb.dto.AdminOverview;
 import com.guangqian.springkb.dto.CategoryCreateRequest;
 import com.guangqian.springkb.dto.CategoryDto;
 import com.guangqian.springkb.dto.DocumentDto;
@@ -73,10 +73,10 @@ public class AdminController {
         }
     }
 
-    /** 概览统计：总文档 / 启用 / 待审 / chunk 总数 / 来源与按 product 的分布（一条 GROUP BY 聚合）。 */
-    @GetMapping("/stats")
-    public ApiResponse<AdminStats> stats() {
-        return ApiResponse.ok(adminService.stats());
+    /** 概览：五域聚合（内容资产 / 审核合规 / 问答检索 / 用户互动 / 系统健康），days 仅接受 7 / 30。 */
+    @GetMapping("/overview")
+    public ApiResponse<AdminOverview> overview(@RequestParam(defaultValue = "7") int days) {
+        return ApiResponse.ok(adminService.overview(days));
     }
 
     /** 导入：请求体为单文档表单（§5.3.1）；空请求体 → 从 data/raw 批量导入。 */

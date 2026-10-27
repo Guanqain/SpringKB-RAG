@@ -17,6 +17,8 @@ ALTER TABLE kb_user ALTER COLUMN role SET DEFAULT 'MEMBER';
 CREATE UNIQUE INDEX IF NOT EXISTS uk_kb_user_username ON kb_user (username);
 -- 邮箱唯一（忽略大小写；历史用户 email 为 NULL 不参与唯一约束）
 CREATE UNIQUE INDEX IF NOT EXISTS uk_kb_user_email ON kb_user (lower(email)) WHERE email IS NOT NULL;
+-- 概览「窗口内新增用户 / 趋势」按 created_at 过滤
+CREATE INDEX IF NOT EXISTS idx_kb_user_created ON kb_user (created_at);
 
 -- ---------------- kb_email_code：邮箱验证码（注册 / 验证码登录 / 绑定邮箱）----------------
 -- 明文保存 6 位验证码，5 分钟过期，使用后置 used=true；同邮箱 60 秒内只允许发送一次（服务层校验）。
@@ -118,6 +120,8 @@ CREATE INDEX IF NOT EXISTS idx_kb_document_review ON kb_document (review_status,
 -- 列表固定 ORDER BY updated_at DESC，并常叠加 product 过滤，补齐对应的排序 / 组合扫描索引。
 CREATE INDEX IF NOT EXISTS idx_kb_document_updated_at ON kb_document (updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_kb_document_product_updated ON kb_document (product, updated_at DESC);
+-- 概览趋势 / 窗口内新增文档按 created_at 过滤
+CREATE INDEX IF NOT EXISTS idx_kb_document_created_at ON kb_document (created_at);
 
 -- ---------------- kb_conversation：用户会话（问答历史）----------------
 -- 会话按登录用户名隔离；ttl 清理由 ConversationService 在读写时顺带执行（30 天无新消息即删）。
@@ -145,6 +149,8 @@ CREATE TABLE IF NOT EXISTS kb_message (
 );
 
 CREATE INDEX IF NOT EXISTS idx_kb_message_conversation ON kb_message (conversation_id, id);
+-- 概览趋势 / 窗口内问答数 / 命中率按 created_at 过滤
+CREATE INDEX IF NOT EXISTS idx_kb_message_created_at ON kb_message (created_at);
 
 -- ---------------- 文档点赞 / 收藏（登录用户级，计数公开）----------------
 CREATE TABLE IF NOT EXISTS kb_doc_like (

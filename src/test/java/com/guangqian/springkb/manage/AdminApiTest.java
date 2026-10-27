@@ -1,6 +1,7 @@
 package com.guangqian.springkb.manage;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -114,7 +115,7 @@ class AdminApiTest {
     void unauthenticatedAccessRejected401() throws Exception {
         mockMvc.perform(get("/api/admin/documents"))
                 .andExpect(status().isUnauthorized());
-        mockMvc.perform(get("/api/admin/stats"))
+        mockMvc.perform(get("/api/admin/overview"))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(patch("/api/admin/documents/x/active").contentType(APPLICATION_JSON)
                         .content("{\"active\":false}"))
@@ -174,46 +175,202 @@ class AdminApiTest {
                 .andExpect(jsonPath("$.data.size").value(2));
     }
 
-    // ---------- 2.1 概览统计：一条聚合 SQL 的总量 / 启用 / 待审 / product 分布 ----------
+    // ---------- 2.1 概览：days=30 五域字段完整、趋势 30 点 ----------
     @Test
-    void statsAggregatesDocuments() throws Exception {
+    void overviewReturnsAllSectionsForThirtyDays() throws Exception {
         String token = registerAndLogin();
-        String uid = uid();
-        String docId = importViaApi(token, officialBody(uid));
-        // 造一条待审且停用的文档，覆盖 pending 与 active 计数
-        jdbcTemplate.update(
-                "UPDATE kb_document SET review_status = 'pending', active = false WHERE id = ?", docId);
-
-        // 期望值直接查库，不依赖测试执行顺序与种子数据
-        long total = queryLong("SELECT count(*) FROM kb_document");
-        long active = queryLong("SELECT count(*) FROM kb_document WHERE active");
-        long pending = queryLong("SELECT count(*) FROM kb_document WHERE review_status = 'pending'");
-        long chunks = queryLong("SELECT COALESCE(sum(chunk_count), 0) FROM kb_document");
-        long official = queryLong("SELECT count(*) FROM kb_document WHERE authority = 'official'");
-        long community = queryLong("SELECT count(*) FROM kb_document WHERE authority = 'community'");
-        Map<String, Long> perProduct = new LinkedHashMap<>();
-        jdbcTemplate.query("SELECT product, count(*) AS cnt FROM kb_document GROUP BY product",
-                (org.springframework.jdbc.core.RowCallbackHandler) rs -> {
-                    perProduct.put(rs.getString("product"), rs.getLong("cnt"));
-                });
-
-        MvcResult r = mockMvc.perform(get("/api/admin/stats").header("Authorization", "Bearer " + token))
+        mockMvc.perform(get("/api/admin/overview").param("days", "30")
+                        .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data.total").value((int) total))
-                .andExpect(jsonPath("$.data.active").value((int) active))
-                .andExpect(jsonPath("$.data.pending").value((int) pending))
-                .andExpect(jsonPath("$.data.chunks").value((int) chunks))
-                .andExpect(jsonPath("$.data.official").value((int) official))
-                .andExpect(jsonPath("$.data.community").value((int) community))
-                .andReturn();
+                .andExpect(jsonPath("$.data.cards.totalDocs").isNumber())
+                .andExpect(jsonPath("$.data.cards.activeRate").isNumber())
+                .andExpect(jsonPath("$.data.cards.foundRate").isNumber())
+                .andExpect(jsonPath("$.data.sections.content.totalDocs").isNumber())
+                .andExpect(jsonPath("$.data.sections.content.products").isArray())
+                .andExpect(jsonPath("$.data.sections.content.otherProducts.total").isNumber())
+                .andExpect(jsonPath("$.data.sections.content.visibility.team").isNumber())
+                .andExpect(jsonPath("$.data.sections.content.visibility.private").isNumber())
+                .andExpect(jsonPath("$.data.sections.content.freshness.unknown").isNumber())
+                .andExpect(jsonPath("$.data.sections.governance.reviewStatus.length()").value(3))
+                .andExpect(jsonPath("$.data.sections.governance.approvalRate").isNumber())
+                .andExpect(jsonPath("$.data.sections.governance.scan.byRule").isArray())
+                .andExpect(jsonPath("$.data.sections.governance.scan.byAction").isArray())
+                .andExpect(jsonPath("$.data.sections.governance.scan.prevWindowBlocks").isNumber())
+                .andExpect(jsonPath("$.data.sections.qa.windowQa").isNumber())
+                .andExpect(jsonPath("$.data.sections.qa.foundRate").isNumber())
+                .andExpect(jsonPath("$.data.sections.qa.blindspotsTop").isArray())
+                .andExpect(jsonPath("$.data.sections.users.total").isNumber())
+                .andExpect(jsonPath("$.data.sections.users.prevNewInWindow").isNumber())
+                .andExpect(jsonPath("$.data.sections.users.prevActiveInWindow").isNumber())
+                .andExpect(jsonPath("$.data.sections.users.roles").isArray())
+                .andExpect(jsonPath("$.data.sections.engagement.likes").isNumber())
+                .andExpect(jsonPath("$.data.sections.engagement.topFavorites").isArray())
+                .andExpect(jsonPath("$.data.sections.health.vectorRows").isNumber())
+                .andExpect(jsonPath("$.data.sections.health.coverageRate").isNumber())
+                .andExpect(jsonPath("$.data.trend.points.length()").value(30))
+                .andExpect(jsonPath("$.data.todos.pendingReview").isNumber())
+                .andExpect(jsonPath("$.data.meta.windowDays").value(30))
+                .andExpect(jsonPath("$.data.meta.generatedAt").isString());
+    }
 
-        JsonNode products = jsonMapper
-                .readTree(r.getResponse().getContentAsString(StandardCharsets.UTF_8))
-                .at("/data/products");
-        assertThat(products.size()).isEqualTo(perProduct.size());
-        products.forEach(p -> assertThat(p.get("count").asLong())
-                .isEqualTo(perProduct.get(p.get("product").asText())));
+    // ---------- 2.2 非法时间窗：days=365 按 7 天处理，不报 4xx ----------
+    @Test
+    void overviewClampsInvalidWindowToSevenDays() throws Exception {
+        String token = registerAndLogin();
+        mockMvc.perform(get("/api/admin/overview").param("days", "365")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.meta.windowDays").value(7))
+                .andExpect(jsonPath("$.data.trend.days").value(7))
+                .andExpect(jsonPath("$.data.trend.points.length()").value(7));
+    }
+
+    // ---------- 2.3 趋势：缺失日期补 0 且点仍存在 ----------
+    @Test
+    void trendFillsMissingDatesWithZero() throws Exception {
+        String token = registerAndLogin();
+        jdbcTemplate.update("DELETE FROM kb_message");
+        jdbcTemplate.update("DELETE FROM kb_document");
+        LocalDate today = jdbcTemplate.queryForObject("SELECT current_date", LocalDate.class);
+        assertThat(today).isNotNull();
+
+        String docId = "trend-" + uid();
+        jdbcTemplate.update("""
+                INSERT INTO kb_document (id, product, title, origin, authority, version, doc_key,
+                                         doc_type, language, chunk_count, created_at, updated_at)
+                VALUES (?, 'trend-product', 'Trend Doc', 'spring.io', 'official', '3.3', ?, 'reference', 'en', 0,
+                        now() - interval '3 days', now())
+                """, docId, "trend-key-" + docId);
+        Long conversationId = jdbcTemplate.queryForObject(
+                "INSERT INTO kb_conversation (username, title) VALUES (?, ?) RETURNING id",
+                Long.class, "trend-asker", "trend");
+        jdbcTemplate.update("""
+                INSERT INTO kb_message (conversation_id, question, answer, found, sources, created_at)
+                VALUES (?, 'trend question', 'trend answer', true, '[]'::jsonb, now() - interval '3 days')
+                """, conversationId);
+
+        MvcResult r = mockMvc.perform(get("/api/admin/overview").param("days", "7")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andReturn();
+        JsonNode points = jsonMapper.readTree(r.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .at("/data/trend/points");
+        assertThat(points.size()).isEqualTo(7);
+        Map<String, JsonNode> byDate = new LinkedHashMap<>();
+        points.forEach(p -> byDate.put(p.get("date").asText(), p));
+
+        JsonNode threeDaysAgo = byDate.get(today.minusDays(3).toString());
+        assertThat(threeDaysAgo).isNotNull();
+        assertThat(threeDaysAgo.get("newDocs").asLong()).isEqualTo(1);
+        assertThat(threeDaysAgo.get("qaCount").asLong()).isEqualTo(1);
+
+        JsonNode sixDaysAgo = byDate.get(today.minusDays(6).toString());
+        assertThat(sixDaysAgo).isNotNull();
+        assertThat(sixDaysAgo.get("newDocs").asLong()).isZero();
+        assertThat(sixDaysAgo.get("qaCount").asLong()).isZero();
+    }
+
+    // ---------- 2.4 技术分布：Top 8 + 其他（剩余项数 / 剩余文档数之和） ----------
+    @Test
+    void productsUseTopEightPlusOtherBucket() throws Exception {
+        String token = registerAndLogin();
+        String uid = uid();
+        for (int i = 0; i < 10; i++) {
+            jdbcTemplate.update("""
+                    INSERT INTO kb_document (id, product, title, origin, authority, version, doc_key,
+                                             doc_type, language, chunk_count)
+                    VALUES (?, ?, ?, 'spring.io', 'official', '3.3', ?, 'reference', 'en', 0)
+                    """, "top8-" + uid + "-" + i, "top8-product-" + uid + "-" + i,
+                    "Top8 Doc " + uid + " " + i, "top8-" + uid + "-" + i);
+        }
+        long totalDocs = queryLong("SELECT count(*) FROM kb_document");
+        long distinctProducts = queryLong("SELECT count(DISTINCT product) FROM kb_document");
+        long top8Sum = queryLong("""
+                SELECT COALESCE(sum(cnt), 0) FROM (
+                    SELECT count(*) AS cnt FROM kb_document GROUP BY product ORDER BY cnt DESC, product LIMIT 8
+                ) t
+                """);
+
+        MvcResult r = mockMvc.perform(get("/api/admin/overview").param("days", "7")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andReturn();
+        JsonNode content = jsonMapper.readTree(r.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .at("/data/sections/content");
+        JsonNode products = content.at("/products");
+        long listed = 0;
+        for (JsonNode p : products) {
+            listed += p.get("count").asLong();
+        }
+        assertThat(products.size()).isLessThanOrEqualTo(8);
+        assertThat(listed).isEqualTo(top8Sum);
+        assertThat(listed + content.at("/otherProducts/total").asLong()).isEqualTo(totalDocs);
+        assertThat(content.at("/otherProducts/count").asLong())
+                .isEqualTo(Math.max(0, distinctProducts - 8));
+    }
+
+    // ---------- 2.5 空库：计数字段为 0、数组为空、比率不出现 null ----------
+    @Test
+    void emptyDatabaseReturnsZeroRatesAndEmptyArrays() throws Exception {
+        String token = registerAndLogin();
+        for (String table : List.of("kb_notification", "kb_scan_log", "kb_doc_like", "kb_doc_favorite",
+                "kb_message", "kb_conversation", "kb_chunk", "kb_document", "kb_user")) {
+            jdbcTemplate.update("DELETE FROM " + table);
+        }
+
+        MvcResult r = mockMvc.perform(get("/api/admin/overview").param("days", "7")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.cards.totalDocs").value(0))
+                .andExpect(jsonPath("$.data.cards.activeRate").isNumber())
+                .andExpect(jsonPath("$.data.cards.foundRate").isNumber())
+                .andExpect(jsonPath("$.data.sections.governance.approvalRate").isNumber())
+                .andExpect(jsonPath("$.data.sections.qa.foundRate").isNumber())
+                .andExpect(jsonPath("$.data.sections.health.coverageRate").isNumber())
+                .andReturn();
+        JsonNode data = jsonMapper.readTree(r.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .at("/data");
+        assertThat(data.at("/cards/totalDocs").asLong()).isZero();
+        assertThat(data.at("/cards/chunks").asLong()).isZero();
+        assertThat(data.at("/cards/activeRate").asDouble()).isZero();
+        assertThat(data.at("/cards/foundRate").asDouble()).isZero();
+        assertThat(data.at("/sections/content/avgChunksPerDoc").asDouble()).isZero();
+        assertThat(data.at("/sections/content/avgAgeDays").asDouble()).isZero();
+        assertThat(data.at("/sections/governance/approvalRate").asDouble()).isZero();
+        assertThat(data.at("/sections/governance/avgReviewHours").asDouble()).isZero();
+        assertThat(data.at("/sections/governance/pendingOldestDays").asDouble()).isZero();
+        assertThat(data.at("/sections/qa/foundRate").asDouble()).isZero();
+        assertThat(data.at("/sections/qa/noAnswerRate").asDouble()).isZero();
+        assertThat(data.at("/sections/qa/avgSources").asDouble()).isZero();
+        assertThat(data.at("/sections/health/coverageRate").asDouble()).isZero();
+        // 环比基线字段存在且非负（空库为 0）
+        assertThat(data.at("/sections/governance/scan/prevWindowBlocks").asLong()).isZero();
+        assertThat(data.at("/sections/users/prevNewInWindow").asLong()).isZero();
+        assertThat(data.at("/sections/users/prevActiveInWindow").asLong()).isZero();
+        assertThat(data.at("/sections/content/products").size()).isZero();
+        assertThat(data.at("/sections/content/otherProducts/total").asLong()).isZero();
+        assertThat(data.at("/sections/governance/scan/byRule").size()).isZero();
+        assertThat(data.at("/sections/qa/blindspotsTop").size()).isZero();
+        assertThat(data.at("/sections/users/topContributors").size()).isZero();
+        assertThat(data.at("/sections/users/roles").size()).isZero();
+        assertThat(data.at("/sections/engagement/topFavorites").size()).isZero();
+        assertThat(data.at("/trend/points").size()).isEqualTo(7);
+        // 时间字段无记录返回 null（不臆造时间）
+        assertThat(data.at("/sections/health/lastIngestedAt").isNull()).isTrue();
+        assertThat(data.at("/sections/health/lastQaAt").isNull()).isTrue();
+    }
+
+    // ---------- 2.6 非管理员：MEMBER 访问概览 403 ----------
+    @Test
+    void memberCannotAccessOverview() throws Exception {
+        String token = registerAndLogin("MEMBER");
+        mockMvc.perform(get("/api/admin/overview").header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
     }
 
     // ---------- 3. 单文档导入：official 文本导入 + 幂等跳过 ----------
@@ -421,15 +578,19 @@ class AdminApiTest {
     // ---------- helpers ----------
 
     /**
-     * 管理接口需要 ADMIN 角色：直接入库一个 ADMIN 再走密码登录。
+     * 管理接口需要 ADMIN 角色：直接入库一个用户再走密码登录。
      * （注册接口创建的角色取决于库内用户数，且 JWT 角色是登录快照，故不能依赖注册后再改库。）
      */
     private String registerAndLogin() throws Exception {
-        String username = "admin" + uid();
+        return registerAndLogin("ADMIN");
+    }
+
+    private String registerAndLogin(String role) throws Exception {
+        String username = ("ADMIN".equals(role) ? "admin" : "member") + uid();
         jdbcTemplate.update("""
                 INSERT INTO kb_user (username, email, password_hash, role)
-                VALUES (?, ?, ?, 'ADMIN')
-                """, username, username + "@test.local", passwordEncoder.encode("123456"));
+                VALUES (?, ?, ?, ?)
+                """, username, username + "@test.local", passwordEncoder.encode("123456"), role);
         MvcResult r = mockMvc.perform(post("/api/auth/login")
                         .contentType(APPLICATION_JSON)
                         .content(json(Map.of("username", username, "password", "123456"))))

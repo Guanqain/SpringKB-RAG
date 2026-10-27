@@ -2,7 +2,7 @@ import http from './http'
 import type { Category, DocumentMetaPayload } from '@/types/admin'
 import type { PageResult } from '@/types/kb'
 import type {
-  AdminStats,
+  AdminOverview,
   BatchApproveResult,
   Chunk,
   Document,
@@ -22,9 +22,9 @@ export function listDocuments(
   return http.get<PageResult<Document>>('/admin/documents', { params })
 }
 
-/** 概览聚合：总文档 / 启用 / 待审 / chunk 数 / 来源与 product 分布 */
-export function fetchAdminStats(): Promise<AdminStats> {
-  return http.get<AdminStats>('/admin/stats')
+/** 概览聚合：五域状态 + 趋势 + 待办 + 元信息（days 仅接受 7/30） */
+export function fetchAdminOverview(days: 7 | 30): Promise<AdminOverview> {
+  return http.get<AdminOverview>('/admin/overview', { params: { days } })
 }
 
 export function importDocument(payload: ImportRequest): Promise<ImportResult> {
