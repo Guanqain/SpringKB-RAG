@@ -65,14 +65,22 @@ const currentLabel = computed(
 <style scoped>
 .admin {
   display: grid;
-  grid-template-columns: var(--admin-sidebar-w) 1fr;
-  min-height: calc(100vh - 68px);
+  grid-template-columns: var(--admin-sidebar-w) minmax(0, 1fr);
+  /* 左右各自滚动：外层锁定视口高度，导航与内容区互不影响 */
+  height: calc(100vh - 68px);
+  height: calc(100dvh - 68px);
+  overflow: hidden;
 }
 
 .admin__sidebar {
   background: var(--ink-900);
   color: var(--ink-300);
   padding: var(--sp-6) var(--sp-3);
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
 
 .admin__side-title {
@@ -130,8 +138,10 @@ const currentLabel = computed(
 .admin__main {
   background: var(--admin-bg);
   min-width: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .admin__toolbar {
@@ -157,8 +167,28 @@ const currentLabel = computed(
 }
 
 .admin__content {
-  padding: var(--sp-8);
+  flex: 1;
   min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--sp-8);
+}
+
+@media (max-width: 1440px) {
+  .admin__content {
+    padding: var(--sp-6);
+  }
+}
+
+@media (max-width: 1180px) {
+  .admin__content {
+    padding: var(--sp-5) var(--sp-4);
+  }
+
+  .admin__toolbar {
+    padding: 0 var(--sp-4);
+  }
 }
 
 /* 路由切换：仅轻微透明度变化，无位移 */
@@ -174,12 +204,15 @@ const currentLabel = computed(
 
 @media (max-width: 900px) {
   .admin {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .admin__sidebar {
+    height: auto;
     display: flex;
     overflow-x: auto;
+    overflow-y: hidden;
     padding: var(--sp-3);
     gap: var(--sp-1);
   }
