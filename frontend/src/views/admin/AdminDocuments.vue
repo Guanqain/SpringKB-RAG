@@ -35,13 +35,14 @@ const productOptions = computed(() => {
   return [...set].sort()
 })
 
-// 版本级联：选定分类时只展示该分类下的版本，否则展示全部
+// 版本级联：选定分类时只展示该分类下的版本，否则展示全部分类的版本
 const versionOptions = computed(() => {
   if (filterForm.product) {
     const hit = categories.value.find((c) => c.product === filterForm.product)
     if (hit?.versions.length) return [...hit.versions].sort()
   }
   const set = new Set<string>()
+  categories.value.forEach((c) => c.versions.forEach((v) => set.add(v)))
   store.documents.forEach((d) => d.version && set.add(d.version))
   return [...set].sort()
 })
@@ -76,7 +77,8 @@ function applyFilter() {
     active: filterForm.active || undefined,
     keyword: filterForm.keyword.trim() || undefined,
   }
-  store.fetchDocuments()
+  // 筛选条件变化后从第 1 页重新取数
+  void store.goToPage(1)
 }
 
 function resetFilter() {
@@ -86,7 +88,17 @@ function resetFilter() {
   filterForm.active = ''
   filterForm.keyword = ''
   store.filter = {}
-  store.fetchDocuments()
+  void store.goToPage(1)
+}
+
+function onPageChange(target: number) {
+  // 改 size 时组件可能连带触发 current-change，页面已由 changeSize 拉到第 1 页则跳过
+  if (target === store.page) return
+  void store.goToPage(target)
+}
+
+function onSizeChange(target: number) {
+  void store.changeSize(target)
 }
 
 onMounted(() => {
@@ -340,6 +352,17 @@ async function saveCategory() {
           </div>
         </template>
       </el-table>
+
+      <el-pagination
+        v-if="store.total > 0"
+        :current-page="store.page"
+        :page-size="store.size"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="store.total"
+        layout="total, sizes, prev, pager, next"
+        @current-change="onPageChange"
+        @size-change="onSizeChange"
+      />
     </div>
 
     <el-drawer v-model="drawerVisible" :title="drawerTitle" size="46%">

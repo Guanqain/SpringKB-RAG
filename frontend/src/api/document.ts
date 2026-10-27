@@ -1,6 +1,8 @@
 import http from './http'
 import type { Category, DocumentMetaPayload } from '@/types/admin'
+import type { PageResult } from '@/types/kb'
 import type {
+  AdminStats,
   BatchApproveResult,
   Chunk,
   Document,
@@ -16,8 +18,13 @@ import type {
 
 export function listDocuments(
   params?: DocumentQuery,
-): Promise<Document[]> {
-  return http.get('/admin/documents', { params })
+): Promise<PageResult<Document>> {
+  return http.get<PageResult<Document>>('/admin/documents', { params })
+}
+
+/** 概览聚合：总文档 / 启用 / 待审 / chunk 数 / 来源与 product 分布 */
+export function fetchAdminStats(): Promise<AdminStats> {
+  return http.get<AdminStats>('/admin/stats')
 }
 
 export function importDocument(payload: ImportRequest): Promise<ImportResult> {

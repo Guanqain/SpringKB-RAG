@@ -19,6 +19,7 @@ import com.guangqian.springkb.crawler.HtmlToMarkdown;
 import com.guangqian.springkb.crawler.ImageRef;
 import com.guangqian.springkb.crawler.RawDocument;
 import com.guangqian.springkb.dto.AdminImportResult;
+import com.guangqian.springkb.dto.AdminStats;
 import com.guangqian.springkb.dto.CategoryCreateRequest;
 import com.guangqian.springkb.dto.CategoryDto;
 import com.guangqian.springkb.dto.DocumentDto;
@@ -42,6 +43,7 @@ import org.jsoup.nodes.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -85,15 +87,9 @@ public class AdminService {
         this.scanAuditService = scanAuditService;
     }
 
-    // ---------- 1. 文档列表：过滤（product/source/version/active/keyword）+ 可选分页 ----------
+    // ---------- 1. 文档列表：过滤（product/source/version/active/keyword）+ 分页 ----------
 
-    /** 全量列表（不分页，默认形态，前端列表/仪表盘直接消费）。 */
-    public List<DocumentDto> listAll(String product, String source, String version, String active, String keyword) {
-        Where w = buildWhere(product, source, version, active, keyword);
-        return jdbcTemplate.query(w.sql(), DOCUMENT_ROW_MAPPER, w.args().toArray());
-    }
-
-    /** 分页列表：page 从 1 起、size 钳制 1~200；与全量列表共用同一 WHERE。 */
+    /** 分页列表：page 从 1 起、size 钳制 1~200。 */
     public PageResult<DocumentDto> page(String product, String source, String version, String active, String keyword,
             int page, int size) {
         Where w = buildWhere(product, source, version, active, keyword);
@@ -106,6 +102,36 @@ public class AdminService {
         args.add((long) (p - 1) * s);
         List<DocumentDto> list = jdbcTemplate.query(w.sql() + " LIMIT ? OFFSET ?", DOCUMENT_ROW_MAPPER, args.toArray());
         return new PageResult<>(list, total, p, s);
+    }
+
+    /** 概览聚合：一条 GROUP BY ROLLUP 同时得到全局指标与按 product 的分布，避免拉取文档行。 */
+    public AdminStats stats() {
+        long[] totals = new long[6];
+        List<AdminStats.ProductCount> products = new ArrayList<>();
+        jdbcTemplate.query("""
+                SELECT product, GROUPING(product) AS total_group,
+                       count(*) AS cnt,
+                       COALESCE(sum(chunk_count), 0) AS chunks,
+                       count(*) FILTER (WHERE active) AS active_cnt,
+                       count(*) FILTER (WHERE review_status = 'pending') AS pending_cnt,
+                       count(*) FILTER (WHERE authority = 'official') AS official_cnt,
+                       count(*) FILTER (WHERE authority = 'community') AS community_cnt
+                FROM kb_document
+                GROUP BY ROLLUP (product)
+                ORDER BY total_group DESC, cnt DESC, product
+                """, (RowCallbackHandler) rs -> {
+            if (rs.getInt("total_group") == 1) {
+                totals[0] = rs.getLong("cnt");
+                totals[1] = rs.getLong("active_cnt");
+                totals[2] = rs.getLong("pending_cnt");
+                totals[3] = rs.getLong("chunks");
+                totals[4] = rs.getLong("official_cnt");
+                totals[5] = rs.getLong("community_cnt");
+            } else {
+                products.add(new AdminStats.ProductCount(rs.getString("product"), rs.getLong("cnt")));
+            }
+        });
+        return new AdminStats(totals[0], totals[1], totals[2], totals[3], totals[4], totals[5], products);
     }
 
     /** 构造 WHERE 子句：参数均以占位符绑定（无 SQL 注入面）；keyword 走 ILIKE 并转义 %/_。 */

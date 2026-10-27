@@ -5,11 +5,14 @@ import java.util.List;
 import com.guangqian.springkb.common.ApiResponse;
 import com.guangqian.springkb.common.NotFoundException;
 import com.guangqian.springkb.dto.ActiveRequest;
+import com.guangqian.springkb.dto.AdminStats;
 import com.guangqian.springkb.dto.CategoryCreateRequest;
 import com.guangqian.springkb.dto.CategoryDto;
+import com.guangqian.springkb.dto.DocumentDto;
 import com.guangqian.springkb.dto.ImportRequest;
 import com.guangqian.springkb.dto.MemberDto;
 import com.guangqian.springkb.dto.MetaUpdateRequest;
+import com.guangqian.springkb.dto.PageResult;
 import com.guangqian.springkb.dto.ReviewActionRequest;
 import com.guangqian.springkb.dto.ReviewBatchRequest;
 import com.guangqian.springkb.dto.RoleUpdateRequest;
@@ -53,26 +56,27 @@ public class AdminController {
         this.scanAuditService = scanAuditService;
     }
 
-    /** 文档列表：product/source/version/active/keyword 过滤；page+size 同时给出时分页返回，否则全量数组。 */
+    /** 文档列表：product/source/version/active/keyword 过滤，始终服务端分页（page 默认 1、size 默认 20，上限 200）。 */
     @GetMapping("/documents")
-    public ApiResponse<?> listDocuments(
+    public ApiResponse<PageResult<DocumentDto>> listDocuments(
             @RequestParam(required = false) String product,
             @RequestParam(required = false) String source,
             @RequestParam(required = false) String version,
             @RequestParam(required = false) String active,
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size) {
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
         try {
-            if (page != null || size != null) {
-                int p = page == null ? 1 : page;
-                int s = size == null ? 20 : size;
-                return ApiResponse.ok(adminService.page(product, source, version, active, keyword, p, s));
-            }
-            return ApiResponse.ok(adminService.listAll(product, source, version, active, keyword));
+            return ApiResponse.ok(adminService.page(product, source, version, active, keyword, page, size));
         } catch (IllegalArgumentException e) {
             return ApiResponse.error(400, e.getMessage());
         }
+    }
+
+    /** 概览统计：总文档 / 启用 / 待审 / chunk 总数 / 来源与按 product 的分布（一条 GROUP BY 聚合）。 */
+    @GetMapping("/stats")
+    public ApiResponse<AdminStats> stats() {
+        return ApiResponse.ok(adminService.stats());
     }
 
     /** 导入：请求体为单文档表单（§5.3.1）；空请求体 → 从 data/raw 批量导入。 */

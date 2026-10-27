@@ -114,6 +114,11 @@ ALTER TABLE kb_document ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS idx_kb_document_review ON kb_document (review_status, updated_at DESC)
     WHERE review_status <> 'approved';
 
+-- ---------------- 管理端文档列表排序 ----------------
+-- 列表固定 ORDER BY updated_at DESC，并常叠加 product 过滤，补齐对应的排序 / 组合扫描索引。
+CREATE INDEX IF NOT EXISTS idx_kb_document_updated_at ON kb_document (updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_kb_document_product_updated ON kb_document (product, updated_at DESC);
+
 -- ---------------- kb_conversation：用户会话（问答历史）----------------
 -- 会话按登录用户名隔离；ttl 清理由 ConversationService 在读写时顺带执行（30 天无新消息即删）。
 CREATE TABLE IF NOT EXISTS kb_conversation (

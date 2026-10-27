@@ -58,12 +58,34 @@ export interface ImportResult {
   docId: string
 }
 
-export interface DocumentQuery {
+/** 分页入参：page 从 1 起，size 由后端钳制在 1~200 */
+export interface PageQuery {
+  page?: number
+  size?: number
+}
+
+export interface DocumentQuery extends PageQuery {
   source?: string
   product?: string
   version?: string
   active?: string
   keyword?: string
+}
+
+/** GET /api/admin/stats 概览聚合（按 product 的分布 + 全局指标） */
+export interface AdminProductCount {
+  product: string
+  count: number
+}
+
+export interface AdminStats {
+  total: number
+  active: number
+  pending: number
+  chunks: number
+  official: number
+  community: number
+  products: AdminProductCount[]
 }
 
 /** GET /api/admin/reviews 查询参数（status 默认 pending） */

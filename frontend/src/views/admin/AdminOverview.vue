@@ -1,17 +1,23 @@
 <script setup lang="ts">
-// 管理后台 · 概览：由原 Dashboard 迁移，数据均来自 /api/admin/documents 真实聚合。
+// 管理后台 · 概览：数据来自 /api/admin/stats 的服务端聚合，不再拉取全量文档行。
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import StatCard from '@/components/StatCard.vue'
-import { listAdminCategories, listDocuments } from '@/api/document'
+import { fetchAdminStats, listAdminCategories } from '@/api/document'
 import type { Category } from '@/types/admin'
-import type { Document } from '@/types/document'
+import type { AdminStats } from '@/types/document'
 
 const router = useRouter()
 
-// 概览必须统计全量文档：不能复用文档管理页的 store.filter，
-// 否则从「文档管理」带着筛选条件回到概览时，技术分布只会剩下被筛中的分类。
-const documents = ref<Document[]>([])
+const stats = ref<AdminStats>({
+  total: 0,
+  active: 0,
+  pending: 0,
+  chunks: 0,
+  official: 0,
+  community: 0,
+  products: [],
+})
 const loading = ref(false)
 // product → 展示名：技术分类注册表可自定义展示名，未配置时回落到 product 本身
 const displayNames = ref<Record<string, string>>({})
@@ -19,29 +25,34 @@ const displayNames = ref<Record<string, string>>({})
 onMounted(async () => {
   loading.value = true
   try {
-    const categories = await listAdminCategories().catch(() => [] as Category[])
+    const [categories, aggregated] = await Promise.all([
+      listAdminCategories().catch(() => [] as Category[]),
+      fetchAdminStats(),
+    ])
     displayNames.value = Object.fromEntries(
       categories.map((c) => [c.product, c.displayName || c.product]),
     )
-    documents.value = await listDocuments()
+    stats.value = aggregated
   } catch {
-    documents.value = []
+    stats.value = {
+      total: 0,
+      active: 0,
+      pending: 0,
+      chunks: 0,
+      official: 0,
+      community: 0,
+      products: [],
+    }
   } finally {
     loading.value = false
   }
 })
 
-const totalDocs = computed(() => documents.value.length)
-const totalChunks = computed(() =>
-  documents.value.reduce((sum, d) => sum + d.chunkCount, 0),
-)
-const activeCount = computed(
-  () => documents.value.filter((d) => d.active).length,
-)
-const inactiveCount = computed(
-  () => documents.value.filter((d) => !d.active).length,
-)
-const hasData = computed(() => documents.value.length > 0)
+const totalDocs = computed(() => stats.value.total)
+const totalChunks = computed(() => stats.value.chunks)
+const activeCount = computed(() => stats.value.active)
+const inactiveCount = computed(() => stats.value.total - stats.value.active)
+const hasData = computed(() => stats.value.total > 0)
 
 interface DistItem {
   label: string
@@ -51,28 +62,19 @@ interface DistItem {
 
 const sourceDist = computed<DistItem[]>(() => {
   const total = totalDocs.value || 1
-  const official = documents.value.filter((d) => d.source === 'official').length
-  const community = documents.value.filter((d) => d.source === 'community').length
   return [
-    { label: '官方文档 official', count: official, pct: (official / total) * 100 },
-    { label: '社区问答 community', count: community, pct: (community / total) * 100 },
+    { label: '官方文档 official', count: stats.value.official, pct: (stats.value.official / total) * 100 },
+    { label: '社区问答 community', count: stats.value.community, pct: (stats.value.community / total) * 100 },
   ]
 })
 
 const productDist = computed<DistItem[]>(() => {
   const total = totalDocs.value || 1
-  const counts = new Map<string, number>()
-  documents.value.forEach((d) => {
-    const product = d.product || '未分类'
-    counts.set(product, (counts.get(product) || 0) + 1)
-  })
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([product, count]) => ({
-      label: displayNames.value[product] ?? product,
-      count,
-      pct: (count / total) * 100,
-    }))
+  return stats.value.products.map((p) => ({
+    label: displayNames.value[p.product] ?? p.product,
+    count: p.count,
+    pct: (p.count / total) * 100,
+  }))
 })
 
 const activeDist = computed<DistItem[]>(() => {
@@ -88,7 +90,7 @@ const activeDist = computed<DistItem[]>(() => {
   <div v-loading="loading">
     <div class="page-head">
       <h2 class="page-head__title">概览</h2>
-      <p class="page-head__sub">团队知识库整体概况（数据来自 admin documents 聚合）</p>
+      <p class="page-head__sub">团队知识库整体概况（数据来自 admin stats 聚合）</p>
     </div>
 
     <div class="stat-grid">

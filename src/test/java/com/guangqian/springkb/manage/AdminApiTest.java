@@ -1,6 +1,7 @@
 package com.guangqian.springkb.manage;
 
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -113,6 +114,8 @@ class AdminApiTest {
     void unauthenticatedAccessRejected401() throws Exception {
         mockMvc.perform(get("/api/admin/documents"))
                 .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/admin/stats"))
+                .andExpect(status().isUnauthorized());
         mockMvc.perform(patch("/api/admin/documents/x/active").contentType(APPLICATION_JSON)
                         .content("{\"active\":false}"))
                 .andExpect(status().isUnauthorized());
@@ -120,26 +123,29 @@ class AdminApiTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // ---------- 2. 列表：过滤（source/version/active/keyword）与分页形态 ----------
+    // ---------- 2. 列表：过滤（source/version/active/keyword）与始终分页 ----------
     @Test
     void listWithFiltersAndPagination() throws Exception {
         String token = registerAndLogin();
         String uid = uid();
         String docId = importViaApi(token, officialBody(uid));
 
-        // 全量列表包含新文档，且默认不含分页包装（data 为数组）
+        // 不带参数也走默认分页：page=1、size=20，data 为 { list, total, page, size }
         mockMvc.perform(get("/api/admin/documents").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(0))
-                .andExpect(jsonPath("$.data").isArray())
-                .andExpect(jsonPath("$.data[?(@.id == '%s')]", docId).exists());
+                .andExpect(jsonPath("$.data.list").isArray())
+                .andExpect(jsonPath("$.data.total").isNumber())
+                .andExpect(jsonPath("$.data.page").value(1))
+                .andExpect(jsonPath("$.data.size").value(20));
 
         // keyword 过滤（唯一 uid 保证命中自身）
         mockMvc.perform(get("/api/admin/documents").param("keyword", uid)
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(1))
-                .andExpect(jsonPath("$.data[0].id").value(docId));
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.list.length()").value(1))
+                .andExpect(jsonPath("$.data.list[0].id").value(docId));
 
         // source/version/active 组合过滤
         mockMvc.perform(get("/api/admin/documents")
@@ -148,7 +154,9 @@ class AdminApiTest {
                         .param("active", "true")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(0));
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.list").isArray())
+                .andExpect(jsonPath("$.data.size").value(20));
 
         // active 参数非法 → 400
         mockMvc.perform(get("/api/admin/documents").param("active", "maybe")
@@ -156,7 +164,7 @@ class AdminApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(400));
 
-        // 分页形态：page+size 同时给出 → data 为 { list, total, page, size }
+        // 显式 page+size：data 仍为 { list, total, page, size }
         mockMvc.perform(get("/api/admin/documents").param("page", "1").param("size", "2")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
@@ -164,6 +172,48 @@ class AdminApiTest {
                 .andExpect(jsonPath("$.data.total").isNumber())
                 .andExpect(jsonPath("$.data.page").value(1))
                 .andExpect(jsonPath("$.data.size").value(2));
+    }
+
+    // ---------- 2.1 概览统计：一条聚合 SQL 的总量 / 启用 / 待审 / product 分布 ----------
+    @Test
+    void statsAggregatesDocuments() throws Exception {
+        String token = registerAndLogin();
+        String uid = uid();
+        String docId = importViaApi(token, officialBody(uid));
+        // 造一条待审且停用的文档，覆盖 pending 与 active 计数
+        jdbcTemplate.update(
+                "UPDATE kb_document SET review_status = 'pending', active = false WHERE id = ?", docId);
+
+        // 期望值直接查库，不依赖测试执行顺序与种子数据
+        long total = queryLong("SELECT count(*) FROM kb_document");
+        long active = queryLong("SELECT count(*) FROM kb_document WHERE active");
+        long pending = queryLong("SELECT count(*) FROM kb_document WHERE review_status = 'pending'");
+        long chunks = queryLong("SELECT COALESCE(sum(chunk_count), 0) FROM kb_document");
+        long official = queryLong("SELECT count(*) FROM kb_document WHERE authority = 'official'");
+        long community = queryLong("SELECT count(*) FROM kb_document WHERE authority = 'community'");
+        Map<String, Long> perProduct = new LinkedHashMap<>();
+        jdbcTemplate.query("SELECT product, count(*) AS cnt FROM kb_document GROUP BY product",
+                (org.springframework.jdbc.core.RowCallbackHandler) rs -> {
+                    perProduct.put(rs.getString("product"), rs.getLong("cnt"));
+                });
+
+        MvcResult r = mockMvc.perform(get("/api/admin/stats").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data.total").value((int) total))
+                .andExpect(jsonPath("$.data.active").value((int) active))
+                .andExpect(jsonPath("$.data.pending").value((int) pending))
+                .andExpect(jsonPath("$.data.chunks").value((int) chunks))
+                .andExpect(jsonPath("$.data.official").value((int) official))
+                .andExpect(jsonPath("$.data.community").value((int) community))
+                .andReturn();
+
+        JsonNode products = jsonMapper
+                .readTree(r.getResponse().getContentAsString(StandardCharsets.UTF_8))
+                .at("/data/products");
+        assertThat(products.size()).isEqualTo(perProduct.size());
+        products.forEach(p -> assertThat(p.get("count").asLong())
+                .isEqualTo(perProduct.get(p.get("product").asText())));
     }
 
     // ---------- 3. 单文档导入：official 文本导入 + 幂等跳过 ----------
@@ -431,6 +481,11 @@ class AdminApiTest {
 
     private int count(String sql, Object... args) {
         Integer n = jdbcTemplate.queryForObject(sql, Integer.class, args);
+        return n == null ? 0 : n;
+    }
+
+    private long queryLong(String sql) {
+        Long n = jdbcTemplate.queryForObject(sql, Long.class);
         return n == null ? 0 : n;
     }
 
