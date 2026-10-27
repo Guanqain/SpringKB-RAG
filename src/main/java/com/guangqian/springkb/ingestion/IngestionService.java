@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 
 import com.guangqian.springkb.crawler.ImageRef;
 import com.guangqian.springkb.crawler.RawDocument;
@@ -53,6 +54,13 @@ public class IngestionService {
             Map.entry("typescript", "official"),
             Map.entry("react", "official"),
             Map.entry("rust", "official"),
+            Map.entry("nacos", "official"),
+            Map.entry("sentinel", "official"),
+            Map.entry("dubbo", "official"),
+            Map.entry("seata", "official"),
+            Map.entry("rocketmq", "official"),
+            Map.entry("elasticsearch", "official"),
+            Map.entry("nginx", "official"),
             Map.entry("stackoverflow", "community"),
             Map.entry("manual-official", "official"),
             Map.entry("manual-community", "community"),
@@ -83,6 +91,13 @@ public class IngestionService {
             Map.entry("typescript", "typescriptlang.org"),
             Map.entry("react", "zh-hans.react.dev"),
             Map.entry("rust", "doc.rust-lang.org"),
+            Map.entry("nacos", "nacos.io"),
+            Map.entry("sentinel", "sentinelguard.io"),
+            Map.entry("dubbo", "dubbo.apache.org"),
+            Map.entry("seata", "seata.apache.org"),
+            Map.entry("rocketmq", "rocketmq.apache.org"),
+            Map.entry("elasticsearch", "elastic.co"),
+            Map.entry("nginx", "nginx.org"),
             Map.entry("stackoverflow", "stackoverflow.com"),
             Map.entry("manual-official", "manual"),
             Map.entry("manual-community", "stackoverflow.com"),
@@ -158,12 +173,21 @@ public class IngestionService {
      * 批量导入：遍历调用 importDocument（走代理，每个文档独立事务），失败文档记入 failed 不中断批次。
      */
     public ImportSummary importAll(List<RawDocument> docs) {
+        return importAll(docs, null);
+    }
+
+    /**
+     * 带进度回调的批量导入：每处理完一篇回调一次 {@code progress(已处理篇数, 累计汇总)}，
+     * 供 CLI 渲染进度条使用；回调传 null 即为无进度模式。
+     */
+    public ImportSummary importAll(List<RawDocument> docs, BiConsumer<Integer, ImportSummary> progress) {
         if (docs == null || docs.isEmpty()) {
             return new ImportSummary(0, 0, 0);
         }
         int imported = 0;
         int skipped = 0;
         int failed = 0;
+        int processed = 0;
         for (RawDocument doc : docs) {
             try {
                 ImportResult r = self.importDocument(doc);
@@ -175,6 +199,10 @@ public class IngestionService {
             } catch (Exception e) {
                 failed++;
                 log.error("导入失败 source={} docKey={}", doc.source(), doc.docKey(), e);
+            }
+            processed++;
+            if (progress != null) {
+                progress.accept(processed, new ImportSummary(imported, skipped, failed));
             }
         }
         log.info("批量导入汇总 imported={} skipped={} failed={}", imported, skipped, failed);

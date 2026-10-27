@@ -31,6 +31,15 @@ public class FakeDocumentSeeder implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
+        try {
+            seedIfAbsent();
+        } catch (Exception e) {
+            // 种子数据是演示用旁路：向量库/Embedding 不可用时只告警，不得阻断启动（爬虫、导入不应依赖它）
+            log.warn("Demo 种子文档跳过（向量库或 Embedding 不可用）：{}", e.getMessage());
+        }
+    }
+
+    private void seedIfAbsent() {
         List<Document> existing = this.vectorStore.similaritySearch(
                 SearchRequest.builder()
                         .query("Spring Boot CDS Class Data Sharing")

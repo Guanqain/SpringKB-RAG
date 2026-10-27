@@ -49,6 +49,14 @@ public final class OriginalUrlResolver {
             case "typescriptlang.org" -> "https://www.typescriptlang.org/zh/docs/" + key + ".html";
             case "zh-hans.react.dev" -> "https://zh-hans.react.dev/" + key;
             case "doc.rust-lang.org" -> "https://doc.rust-lang.org/book/" + key + ".html";
+            case "nacos.io" -> "https://nacos.io/docs/latest/" + key + "/";
+            case "sentinelguard.io" -> "https://sentinelguard.io/zh-cn/docs/" + key + ".html";
+            case "dubbo.apache.org" -> "https://dubbo.apache.org/zh-cn/overview/mannual/java-sdk/" + key + "/";
+            case "seata.apache.org" ->
+                    "https://seata.apache.org/zh-cn/docs/v" + pathVersion(version, "2.5") + "/" + key + "/";
+            case "rocketmq.apache.org" -> "https://rocketmq.apache.org/zh/docs/" + ("index".equals(key) ? "" : key + "/");
+            case "elastic.co" -> "https://www.elastic.co/docs/" + key;
+            case "nginx.org" -> "https://nginx.org/en/docs/" + ("index".equals(key) ? "index.html" : key + ".html");
             default -> null;
         };
     }

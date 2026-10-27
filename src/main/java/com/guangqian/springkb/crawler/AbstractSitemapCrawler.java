@@ -88,21 +88,39 @@ public abstract class AbstractSitemapCrawler implements DocumentCrawler {
         return Jsoup.connect(url).userAgent(UA).timeout(FETCH_TIMEOUT_MS);
     }
 
+    /**
+     * 单页最多尝试次数。网络链路不稳的站点（TLS 握手被间歇 reset）可调高，
+     * 每次失败退避 {@code 400ms × 尝试序号}。
+     */
+    protected int maxAttempts() {
+        return MAX_ATTEMPTS;
+    }
+
+    /** 请求间隔（毫秒）。链路易被 reset 的站点可调高以降低触发概率。 */
+    protected int politeDelayMs() {
+        return POLITE_DELAY_MS;
+    }
+
     @Override
     public List<RawDocument> crawlSample(int limit) {
         boolean unlimited = limit <= 0;
         List<String[]> entries = collectUrls();
         log.info("[{}] sitemap 共 {} 个候选 URL，篇数上限={}", source(), entries.size(),
                 unlimited ? "不限" : String.valueOf(limit));
+        Set<String> doneUrls = CrawlCheckpoint.doneUrls(source());
         List<RawDocument> result = new ArrayList<>();
         for (String[] entry : entries) {
             if (!unlimited && result.size() >= limit) {
                 break;
             }
+            if (doneUrls.contains(entry[0])) {
+                continue; // 断点续抓：已抓过的页面直接跳过
+            }
             try {
                 RawDocument doc = fetch(entry[0], entry[1]);
                 if (doc != null) {
                     result.add(doc);
+                    CrawlCheckpoint.append(source(), doc);
                     if (result.size() % PROGRESS_EVERY == 0) {
                         log.info("[{}] 已抓取 {} 篇", source(), result.size());
                     }
@@ -110,7 +128,7 @@ public abstract class AbstractSitemapCrawler implements DocumentCrawler {
             } catch (Exception e) {
                 log.warn("[{}] 抓取失败 {} : {}", source(), entry[0], e.getMessage());
             }
-            sleep(POLITE_DELAY_MS);
+            sleep(politeDelayMs());
         }
         log.info("[{}] 抓取完成 {} 篇", source(), result.size());
         return result;
@@ -179,7 +197,8 @@ public abstract class AbstractSitemapCrawler implements DocumentCrawler {
 
     private Document fetchWithRetry(String url) throws Exception {
         Exception last = null;
-        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        int attempts = maxAttempts();
+        for (int attempt = 1; attempt <= attempts; attempt++) {
             try {
                 return connection(url).get();
             } catch (Exception e) {

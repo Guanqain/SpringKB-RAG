@@ -137,4 +137,97 @@ class ExtendedDocsCrawlerMappingTest {
         assertThat(rust.docKey("https://doc.rust-lang.org/book/ch01-00-getting-started.html"))
                 .isEqualTo("ch01-00-getting-started");
     }
+
+    @Test
+    void nacosLatestDocsOnly() {
+        NacosDocsCrawler nacos = new NacosDocsCrawler();
+        String url = "https://nacos.io/docs/latest/overview/";
+
+        assertThat(nacos.isDocPage(url)).isTrue();
+        assertThat(nacos.docKey(url)).isEqualTo("overview");
+        assertThat(nacos.language(url)).isEqualTo("zh");
+        assertThat(nacos.docType("overview")).isEqualTo("guide");
+        assertThat(nacos.docType("admin/admin-api")).isEqualTo("howto");
+        // 旧版路径与英文站不抓
+        assertThat(nacos.isDocPage("https://nacos.io/zh-cn/docs/v2/what-is-nacos.html")).isFalse();
+        assertThat(nacos.isDocPage("https://nacos.io/en/docs/latest/overview/")).isFalse();
+    }
+
+    @Test
+    void sentinelDocs() {
+        SentinelDocsCrawler sentinel = new SentinelDocsCrawler();
+        String url = "https://sentinelguard.io/zh-cn/docs/quick-start.html";
+
+        assertThat(sentinel.isDocPage(url)).isTrue();
+        assertThat(sentinel.docKey(url)).isEqualTo("quick-start");
+        assertThat(sentinel.language(url)).isEqualTo("zh");
+        assertThat(sentinel.docKey("https://sentinelguard.io/zh-cn/docs/index.html")).isNull();
+        assertThat(sentinel.isDocPage("https://sentinelguard.io/en/docs/quick-start.html")).isFalse();
+    }
+
+    @Test
+    void dubboJavaSdkManualOnly() {
+        DubboDocsCrawler dubbo = new DubboDocsCrawler();
+        String url =
+                "https://dubbo.apache.org/zh-cn/overview/mannual/java-sdk/tasks/protocols/triple/interface/";
+
+        assertThat(dubbo.isDocPage(url)).isTrue();
+        assertThat(dubbo.docKey(url)).isEqualTo("tasks/protocols/triple/interface");
+        assertThat(dubbo.docType("tasks/protocols/triple/interface")).isEqualTo("howto");
+        assertThat(dubbo.docType("reference-manual/faq/0/1")).isEqualTo("qa");
+        assertThat(dubbo.isDocPage("https://dubbo.apache.org/zh-cn/blog/2023/01/16/x/")).isFalse();
+    }
+
+    @Test
+    void seataOnlyCurrentVersion() {
+        SeataDocsCrawler seata = new SeataDocsCrawler();
+        String url = "https://seata.apache.org/zh-cn/docs/v2.5/overview/what-is-seata";
+
+        assertThat(seata.isDocPage(url)).isTrue();
+        assertThat(seata.docKey(url)).isEqualTo("overview/what-is-seata");
+        assertThat(seata.version(url)).isEqualTo("2.5");
+        assertThat(seata.language(url)).isEqualTo("zh");
+        assertThat(seata.isDocPage("https://seata.apache.org/zh-cn/docs/v2.4/overview/what-is-seata")).isFalse();
+    }
+
+    @Test
+    void rocketMqCurrentDocs() {
+        RocketMqDocsCrawler rocketmq = new RocketMqDocsCrawler();
+        String url = "https://rocketmq.apache.org/zh/docs/introduction/02concepts";
+
+        assertThat(rocketmq.isDocPage(url)).isTrue();
+        assertThat(rocketmq.docKey(url)).isEqualTo("introduction/02concepts");
+        assertThat(rocketmq.docKey("https://rocketmq.apache.org/zh/docs/")).isEqualTo("index");
+        assertThat(rocketmq.language(url)).isEqualTo("zh");
+        assertThat(rocketmq.isDocPage("https://rocketmq.apache.org/zh/blog/2023/01/01/x")).isFalse();
+        assertThat(rocketmq.isDocPage("https://rocketmq.apache.org/docs/introduction/02concepts")).isFalse();
+    }
+
+    @Test
+    void elasticsearchReferenceAndQueryScope() {
+        ElasticsearchDocsCrawler es = new ElasticsearchDocsCrawler();
+        String apiUrl = "https://www.elastic.co/docs/reference/elasticsearch/rest-apis/api-conventions";
+        String queryUrl = "https://www.elastic.co/docs/explore-analyze/query-filter/aggregations";
+
+        assertThat(es.isDocPage(apiUrl)).isTrue();
+        assertThat(es.docKey(apiUrl)).isEqualTo("reference/elasticsearch/rest-apis/api-conventions");
+        assertThat(es.docType(es.docKey(apiUrl))).isEqualTo("api");
+        assertThat(es.isDocPage(queryUrl)).isTrue();
+        assertThat(es.docType(es.docKey(queryUrl))).isEqualTo("guide");
+        // 客户端库与其它一级栏目不抓
+        assertThat(es.isDocPage("https://www.elastic.co/docs/reference/elasticsearch/clients/java/laminate")).isFalse();
+        assertThat(es.isDocPage("https://www.elastic.co/docs/deploy-manage/deploy/self-managed/install")).isFalse();
+    }
+
+    @Test
+    void nginxDocsAcceptHttpSitemapUrls() {
+        NginxDocsCrawler nginx = new NginxDocsCrawler();
+
+        assertThat(nginx.isDocPage("http://nginx.org/en/docs/http/ngx_http_core_module.html")).isTrue();
+        assertThat(nginx.docKey("http://nginx.org/en/docs/http/ngx_http_core_module.html"))
+                .isEqualTo("http/ngx_http_core_module");
+        assertThat(nginx.docKey("https://nginx.org/en/docs/beginners_guide.html")).isEqualTo("beginners_guide");
+        assertThat(nginx.isDocPage("https://nginx.org/ru/docs/beginners_guide.html")).isFalse();
+        assertThat(nginx.isDocPage("https://nginx.org/en/docs/")).isFalse();
+    }
 }

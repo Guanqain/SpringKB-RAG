@@ -86,6 +86,29 @@ class OriginalUrlResolverTest {
     }
 
     @Test
+    void resolvesMicroserviceAndMiddlewareSources() {
+        assertThat(OriginalUrlResolver.resolve("nacos", "nacos.io", "latest", "overview"))
+                .isEqualTo("https://nacos.io/docs/latest/overview/");
+        assertThat(OriginalUrlResolver.resolve("sentinel", "sentinelguard.io", "latest", "quick-start"))
+                .isEqualTo("https://sentinelguard.io/zh-cn/docs/quick-start.html");
+        assertThat(OriginalUrlResolver.resolve("dubbo", "dubbo.apache.org", "latest", "tasks/protocols/triple/interface"))
+                .isEqualTo("https://dubbo.apache.org/zh-cn/overview/mannual/java-sdk/tasks/protocols/triple/interface/");
+        assertThat(OriginalUrlResolver.resolve("seata", "seata.apache.org", "2.5", "overview/what-is-seata"))
+                .isEqualTo("https://seata.apache.org/zh-cn/docs/v2.5/overview/what-is-seata/");
+        assertThat(OriginalUrlResolver.resolve("rocketmq", "rocketmq.apache.org", "latest", "index"))
+                .isEqualTo("https://rocketmq.apache.org/zh/docs/");
+        assertThat(OriginalUrlResolver.resolve("rocketmq", "rocketmq.apache.org", "latest", "introduction/02concepts"))
+                .isEqualTo("https://rocketmq.apache.org/zh/docs/introduction/02concepts/");
+        assertThat(OriginalUrlResolver.resolve("elasticsearch", "elastic.co", "latest",
+                "reference/elasticsearch/rest-apis/api-conventions"))
+                .isEqualTo("https://www.elastic.co/docs/reference/elasticsearch/rest-apis/api-conventions");
+        assertThat(OriginalUrlResolver.resolve("nginx", "nginx.org", "latest", "http/ngx_http_core_module"))
+                .isEqualTo("https://nginx.org/en/docs/http/ngx_http_core_module.html");
+        assertThat(OriginalUrlResolver.resolve("nginx", "nginx.org", "latest", "index"))
+                .isEqualTo("https://nginx.org/en/docs/index.html");
+    }
+
+    @Test
     void returnsNullForUnreconstructableSources() {
         // 未知站点 / manual / ugc(team)
         assertThat(OriginalUrlResolver.resolve("vue", "example.com", "3.x", "foo")).isNull();

@@ -104,6 +104,7 @@ public abstract class AbstractIndexCrawler implements DocumentCrawler {
         }
         int fetched = 0;
         int cap = maxPages();
+        Set<String> doneUrls = CrawlCheckpoint.doneUrls(source());
         while (!queue.isEmpty()) {
             if (!unlimited && result.size() >= limit) {
                 break;
@@ -115,6 +116,9 @@ public abstract class AbstractIndexCrawler implements DocumentCrawler {
             String[] item = queue.poll();
             String url = item[0];
             int depth = Integer.parseInt(item[1]);
+            if (doneUrls.contains(url)) {
+                continue; // 断点续抓：已抓过的页面直接跳过
+            }
             fetched++;
             Document doc;
             try {
@@ -131,6 +135,7 @@ public abstract class AbstractIndexCrawler implements DocumentCrawler {
                 RawDocument raw = toRawDocument(doc, url);
                 if (raw != null) {
                     result.add(raw);
+                    CrawlCheckpoint.append(source(), raw);
                     if (result.size() % PROGRESS_EVERY == 0) {
                         log.info("[{}] 已抓取 {} 篇（待抓队列 {}）", source(), result.size(), queue.size());
                     }

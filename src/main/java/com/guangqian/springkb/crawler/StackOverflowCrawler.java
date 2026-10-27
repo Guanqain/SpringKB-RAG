@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.jsoup.Jsoup;
@@ -99,14 +100,21 @@ public class StackOverflowCrawler implements DocumentCrawler {
 
         List<Long> ids = questions.keySet().stream().limit(limit).toList();
         Map<Long, List<Map<String, Object>>> answers = fetchAnswers(ids);
+        Set<String> doneUrls = CrawlCheckpoint.doneUrls(source());
         List<RawDocument> docs = new ArrayList<>();
         for (Long id : ids) {
+            Map<String, Object> question = questions.get(id);
+            if (doneUrls.contains(stringOf(question.get("link")))) {
+                continue; // 断点续抓：已入库的问题直接跳过
+            }
             List<Map<String, Object>> top = answers.get(id);
             if (top == null || top.isEmpty()) {
                 continue; // 无回答的问题对问答库价值低，跳过
             }
             try {
-                docs.add(toDocument(questions.get(id), top));
+                RawDocument doc = toDocument(question, top);
+                docs.add(doc);
+                CrawlCheckpoint.append(source(), doc);
             } catch (Exception e) {
                 log.warn("[stackoverflow] 组装文档失败 questionId={} : {}", id, e.getMessage());
             }

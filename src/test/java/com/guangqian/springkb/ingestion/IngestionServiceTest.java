@@ -1,6 +1,7 @@
 package com.guangqian.springkb.ingestion;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -170,6 +171,26 @@ class IngestionServiceTest {
         assertThat(count("SELECT count(*) FROM kb_document WHERE id = ?", docId)).isZero();
         assertThat(count("SELECT count(*) FROM kb_chunk WHERE doc_id = ?", docId)).isZero();
         assertThat(count("SELECT count(*) FROM vector_store WHERE metadata ->> 'doc_id' = ?", docId)).isZero();
+    }
+
+    // ---------- 5. 批量导入进度回调：每篇一次、计数单调递增、汇总与返回值一致 ----------
+    @Test
+    void importAllReportsProgressPerDocument() {
+        List<RawDocument> docs = List.of(sampleDoc(uid()), sampleDoc(uid()), emptyDoc(uid()));
+        List<Integer> processedSeq = new ArrayList<>();
+        List<ImportSummary> summaries = new ArrayList<>();
+
+        ImportSummary result = ingestionService.importAll(docs, (processed, soFar) -> {
+            processedSeq.add(processed);
+            summaries.add(soFar);
+        });
+
+        // 回调次数 == 文档数，序号 1..n 连续
+        assertThat(processedSeq).containsExactly(1, 2, 3);
+        // 累计计数单调不减，且与最终返回值一致
+        assertThat(summaries.get(2).imported()).isEqualTo(result.imported());
+        assertThat(summaries.get(2).skipped()).isEqualTo(result.skipped());
+        assertThat(result.imported() + result.skipped() + result.failed()).isEqualTo(docs.size());
     }
 
     // ---------- helpers ----------

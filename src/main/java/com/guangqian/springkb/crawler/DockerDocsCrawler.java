@@ -14,13 +14,20 @@ import org.springframework.stereotype.Component;
 /**
  * Docker 官方文档（docs.docker.com）。排除自动生成的 API 参考页（/reference/api/）与站点搜索页。
  *
- * <p>该站由 S3/CloudFront 提供，证书链在本机 Java TLS 客户端校验失败（curl 也需 -k），
- * 因此仅对本站使用信任所有证书的连接工厂；抓取内容为公开文档，不涉及凭据。</p>
+ * <p>该站由 S3/CloudFront 提供，本机到其边缘节点的 TLS 握手会被间歇性 reset
+ * （curl 实测单次成功率仅约 30%，报错 {@code Recv failure: Connection was reset}），
+ * 因此本类做了三处针对性加固：信任所有证书、伪装浏览器 UA、把重试次数提到 6 次并放慢节奏。
+ * 抓取内容为公开文档，不涉及凭据。</p>
  */
 @Component
 public class DockerDocsCrawler extends AbstractSitemapCrawler {
 
     private static final String BASE = "https://docs.docker.com/";
+
+    /** 链路不稳时用真实浏览器 UA 的握手成功率略高。 */
+    private static final String BROWSER_UA =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                    + "Chrome/131.0.0.0 Safari/537.36";
 
     private static final SSLSocketFactory TRUST_ALL = trustAllFactory();
 
@@ -51,7 +58,23 @@ public class DockerDocsCrawler extends AbstractSitemapCrawler {
 
     @Override
     protected Connection connection(String url) {
-        return super.connection(url).sslSocketFactory(TRUST_ALL);
+        return super.connection(url)
+                .userAgent(BROWSER_UA)
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .header("Accept-Language", "en-US,en;q=0.9")
+                .sslSocketFactory(TRUST_ALL);
+    }
+
+    /** TLS 握手约 70% 概率被 reset，重试 6 次的单页成功率约 1 - 0.7^6 ≈ 88%。 */
+    @Override
+    protected int maxAttempts() {
+        return 6;
+    }
+
+    /** 放慢节奏，降低触发 reset 的概率。 */
+    @Override
+    protected int politeDelayMs() {
+        return 300;
     }
 
     private static SSLSocketFactory trustAllFactory() {
