@@ -48,7 +48,7 @@
 
 - [x] Task 8: 文档与提交
   - [x] SubTask 8.1: `agent.md` 补坑位/进度/日志索引；`docs/devlog/2026-10-27.md` 追加概览重设计小节（含统计口径表与隐私边界）
-  - [ ] SubTask 8.2: 按约定提交 `feat: 管理端概览页重做为全系统状态看板`
+  - [x] SubTask 8.2: 按约定提交 `feat: 管理端概览页重做为全系统状态看板`（commit 704fd15）
 
 # Task Dependencies
 
