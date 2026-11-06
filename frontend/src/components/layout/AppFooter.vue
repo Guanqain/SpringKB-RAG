@@ -20,7 +20,7 @@ const columns = [
             <span class="footer__brand-name">SpringKB</span>
           </div>
           <p class="footer__brand-desc">
-            面向开发者的框架文档 RAG 搜索引擎。整合 Spring 全家桶、Vue 等主流框架官方文档，提供自然语言问答与精准溯源。
+            面向团队的私有知识库与 RAG 问答：Spring / Vue 官方文档按版本隔离检索，官方优先，回答带引用出处。
           </p>
         </div>
 

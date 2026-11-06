@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { ask, fetchVersions } from '@/api/qa'
 import {
@@ -31,6 +32,8 @@ const EXAMPLES = [
 ]
 
 const auth = useAuthStore()
+const route = useRoute()
+const router = useRouter()
 const state = ref<ViewState>('idle')
 const versions = ref<string[]>([])
 const history = ref<QaHistoryEntry[]>([])
@@ -61,7 +64,11 @@ onMounted(async () => {
   } catch {
     /* 版本下拉静默降级为「全部版本」 */
   }
-  if (auth.isAuthenticated) {
+
+  // 首页搜索框 / 示例问题会带 ?q= 跳转过来：直接发起提问
+  const initialQuestion = typeof route.query.q === 'string' ? route.query.q.trim() : ''
+
+  if (auth.isAuthenticated && !initialQuestion) {
     try {
       await loadConversationList()
       if (conversations.value.length) {
@@ -70,6 +77,14 @@ onMounted(async () => {
     } catch {
       /* 会话加载失败不影响问答本身 */
     }
+  }
+
+  if (initialQuestion) {
+    // 清掉 query，避免刷新页面时重复提问
+    void router.replace({ path: '/qa' })
+    await submit(initialQuestion)
+  } else {
+    nextTick(() => askRef.value?.focus())
   }
 })
 

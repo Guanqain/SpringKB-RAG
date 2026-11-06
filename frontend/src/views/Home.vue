@@ -1,26 +1,39 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { fetchKbOverview } from '@/api/kb'
-import type { KbOverview } from '@/types/kb'
+import { fetchKbOverview, fetchKbTree } from '@/api/kb'
+import type { KbOverview, KbTreeNode } from '@/types/kb'
 
-// 首页（外壳）：Hero + 统计条 + 产品线卡 + 功能区。
-// 数据口径：统计条改用公开的 GET /api/kb/overview（普通成员也可访问，
-// 不再依赖仅 ADMIN 可用的 /api/admin/documents）。
+// 首页：Hero + 统计条 + 产品线卡 + 功能区。
+// 数据口径：公开的 GET /api/kb/overview 与 /api/kb/tree，拿不到就显示占位，不编造数字。
 
 const router = useRouter()
 
 const overview = ref<KbOverview | null>(null)
+const tree = ref<KbTreeNode[]>([])
 const failed = ref(false)
 
 onMounted(async () => {
-  try {
-    overview.value = await fetchKbOverview()
-  } catch {
-    // 请求失败 → 统计条显示占位空态，不崩溃
-    failed.value = true
-  }
+  const [ov, tr] = await Promise.allSettled([fetchKbOverview(), fetchKbTree()])
+  if (ov.status === 'fulfilled') overview.value = ov.value
+  else failed.value = true
+  if (tr.status === 'fulfilled') tree.value = tr.value
 })
+
+/** 产品线分组（与知识库体系树的产品线 key 对齐），用于展示真实收录量 */
+const SPRING_PRODUCTS = ['spring-framework', 'spring-boot', 'spring-security', 'spring-data-jpa', 'spring-ai']
+const VUE_PRODUCTS = ['vue', 'vue-router', 'pinia', 'vite']
+
+function countOf(keys: string[]): number | null {
+  if (!tree.value.length) return null
+  const total = tree.value
+    .filter((p) => keys.includes(p.key))
+    .reduce((sum, p) => sum + p.documentCount, 0)
+  return total > 0 ? total : null
+}
+
+const springCount = computed(() => countOf(SPRING_PRODUCTS))
+const vueCount = computed(() => countOf(VUE_PRODUCTS))
 
 /** 真实数值仅在聚合成功后渲染，其余一律占位「—」 */
 function realValue(fn: (data: KbOverview) => number): string {
@@ -36,15 +49,15 @@ interface StatItem {
 
 const stats = computed<StatItem[]>(() => {
   const aggHint = failed.value
-    ? '聚合接口不可用'
+    ? '聚合接口暂不可用'
     : overview.value
-      ? '来自知识库聚合'
+      ? '已入库并可检索'
       : '加载中…'
   return [
     { value: realValue((d) => d.documentCount), label: '文档总数', hint: aggHint, live: Boolean(overview.value) },
-    { value: realValue((d) => d.productCount), label: '技术分类', hint: '可自定义扩充', live: Boolean(overview.value) },
-    { value: realValue((d) => d.versionCount), label: '覆盖版本', hint: '由文档版本聚合', live: Boolean(overview.value) },
-    { value: realValue((d) => d.sourceCount), label: '来源渠道', hint: '官方 / 社区 / 上传', live: Boolean(overview.value) },
+    { value: realValue((d) => d.productCount), label: '技术分类', hint: 'Spring / Vue 等产品线', live: Boolean(overview.value) },
+    { value: realValue((d) => d.versionCount), label: '覆盖版本', hint: '问答时按版本隔离', live: Boolean(overview.value) },
+    { value: realValue((d) => d.sourceCount), label: '来源渠道', hint: '官方文档 + 社区问答', live: Boolean(overview.value) },
   ]
 })
 
@@ -80,11 +93,11 @@ function goQa(text: string) {
         </div>
 
         <h1 class="hero__title">
-          让技术文档<br /><em>开口说话</em>
+          问一句，<br /><em>答案带出处</em>
         </h1>
         <p class="hero__desc">
-          整合 Spring Boot、Spring AI、Vue 等主流框架官方文档，<br />
-          自然语言问答 · 精准引用溯源 · 中英文双语匹配
+          面向团队的 Spring / Vue 私有知识库<br />
+          一次提问只在指定版本内检索，官方文档优先，答不出来会直说
         </p>
 
         <form class="hero__search" @submit.prevent="goQa(question)">
@@ -105,7 +118,7 @@ function goQa(text: string) {
           <input
             v-model="question"
             class="hero__search-input"
-            :placeholder="EXAMPLES[0]"
+            placeholder="输入你的问题，或从下面挑一个"
           />
           <button class="hero__search-btn" type="submit">开始问答</button>
         </form>
@@ -141,8 +154,8 @@ function goQa(text: string) {
       <div class="container">
         <div class="section__header">
           <div>
-            <h2 class="section__title">覆盖主流技术栈</h2>
-            <p class="section__subtitle">精选官方案例，持续更新</p>
+            <h2 class="section__title">收录了哪些文档</h2>
+            <p class="section__subtitle">官方文档按产品线与版本归档，社区问答作为补充</p>
           </div>
           <router-link class="section__link" to="/kb">
             浏览全部
@@ -193,14 +206,22 @@ function goQa(text: string) {
                 <path d="m2 12 10 5 10-5" />
               </svg>
             </div>
-            <h3 class="product__title">Spring Boot</h3>
+            <h3 class="product__title">Spring 生态</h3>
             <p class="product__desc">
-              从自动配置到 Actuator，从数据源到安全框架，覆盖生产环境常见场景。
+              Framework、Boot、Security、Data JPA、AI 的官方参考文档，按版本分线收录。
             </p>
+            <div class="product__tags">
+              <span class="product__tag">Spring Framework</span>
+              <span class="product__tag">Spring Boot</span>
+              <span class="product__tag">Spring Security</span>
+              <span class="product__tag">Spring Data JPA</span>
+              <span class="product__tag">Spring AI</span>
+            </div>
             <div class="product__meta">
-              <span class="product__meta-item product__meta-item--muted">
-                收录情况见知识库
+              <span v-if="springCount !== null" class="product__meta-item num">
+                {{ springCount }} 篇文档
               </span>
+              <span v-else class="product__meta-item product__meta-item--muted">查看知识库</span>
             </div>
           </router-link>
 
@@ -228,20 +249,30 @@ function goQa(text: string) {
                 fill="none"
                 stroke="currentColor"
                 stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
               >
-                <path d="M12 2a10 10 0 1 0 10 10" />
-                <circle cx="12" cy="12" r="3" />
-                <path d="M12 2v4" />
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
               </svg>
             </div>
-            <h3 class="product__title">Spring AI</h3>
+            <h3 class="product__title">Vue 生态</h3>
             <p class="product__desc">
-              ChatClient、Embedding、RAG 全链路封装，快速构建企业级 AI 应用。
+              Vue 3 与周边工具的官方文档，覆盖组合式 API、路由、状态管理与构建。
             </p>
+            <div class="product__tags">
+              <span class="product__tag">Vue 3</span>
+              <span class="product__tag">Vue Router</span>
+              <span class="product__tag">Pinia</span>
+              <span class="product__tag">Vite</span>
+            </div>
             <div class="product__meta">
-              <span class="product__meta-item product__meta-item--muted">
-                收录情况见知识库
+              <span v-if="vueCount !== null" class="product__meta-item num">
+                {{ vueCount }} 篇文档
               </span>
+              <span v-else class="product__meta-item product__meta-item--muted">查看知识库</span>
             </div>
           </router-link>
 
@@ -269,20 +300,22 @@ function goQa(text: string) {
                 fill="none"
                 stroke="currentColor"
                 stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
               >
-                <path d="M4 4h16v4H4V4zm0 8h16v8H4v-8z" />
-                <path d="M8 12v8" />
-                <path d="M16 12v8" />
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
             </div>
-            <h3 class="product__title">Vue 3</h3>
+            <h3 class="product__title">社区实践</h3>
             <p class="product__desc">
-              Composition API、响应式原理、生态工具链，前端开发一站式参考。
+              Stack Overflow 高票问答作为官方之外的补充，回答里会标明来源是官方还是社区。
             </p>
+            <div class="product__tags">
+              <span class="product__tag">Stack Overflow</span>
+              <span class="product__tag">实战问题</span>
+            </div>
             <div class="product__meta">
-              <span class="product__meta-item product__meta-item--muted">
-                收录情况见知识库
-              </span>
+              <span class="product__meta-item product__meta-item--muted">与官方文档同库检索</span>
             </div>
           </router-link>
         </div>
@@ -294,8 +327,8 @@ function goQa(text: string) {
       <div class="container">
         <div class="section__header">
           <div>
-            <h2 class="section__title">企业级 RAG 能力</h2>
-            <p class="section__subtitle">不止是搜索，更要可解释、可追溯、可迭代</p>
+            <h2 class="section__title">问答是怎么工作的</h2>
+            <p class="section__subtitle">检索、加权、兜底、溯源，每一步都有明确边界</p>
           </div>
         </div>
 
@@ -312,13 +345,63 @@ function goQa(text: string) {
                 stroke-linecap="round"
                 stroke-linejoin="round"
               >
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                <path d="M12 2 2 7l10 5 10-5-10-5z" />
+                <path d="m2 17 10 5 10-5" />
+                <path d="m2 12 10 5 10-5" />
               </svg>
             </div>
             <div>
-              <h3 class="feature__title">自然语言问答</h3>
+              <h3 class="feature__title">版本隔离检索</h3>
               <p class="feature__desc">
-                用日常说话的方式提问，系统自动理解意图、检索最相关的知识片段，生成可直接使用的答案。
+                提问时选定版本，检索只在该版本的文档里召回。3.x 的写法和 4.2 的写法不会出现在同一个回答里。
+              </p>
+            </div>
+          </div>
+
+          <div class="feature">
+            <div class="feature__icon">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="feature__title">官方优先，社区补充</h3>
+              <p class="feature__desc">
+                官方文档在排序时获得加权，社区答案不删除、只排在后面；每条引用都会标注「官方」或「社区」。
+              </p>
+            </div>
+          </div>
+
+          <div class="feature">
+            <div class="feature__icon">
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 8v4" />
+                <path d="M12 16h.01" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="feature__title">答不出来就说不知道</h3>
+              <p class="feature__desc">
+                检索相似度低于阈值时直接返回「知识库中未找到相关答案」，不调用模型，也不编造。
               </p>
             </div>
           </div>
@@ -342,36 +425,9 @@ function goQa(text: string) {
               </svg>
             </div>
             <div>
-              <h3 class="feature__title">引用可溯源</h3>
+              <h3 class="feature__title">每条结论都有出处</h3>
               <p class="feature__desc">
-                每段答案都标注来源文档、章节、原文片段，点击即可跳转，不再担心 AI 幻觉。
-              </p>
-            </div>
-          </div>
-
-          <div class="feature">
-            <div class="feature__icon">
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <path d="M2 12h20" />
-                <path
-                  d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"
-                />
-              </svg>
-            </div>
-            <div>
-              <h3 class="feature__title">多语言支持</h3>
-              <p class="feature__desc">
-                中英双语提问都能准确检索。中文问法匹配英文文档，借助多语言向量模型实现跨语言语义理解。
+                回答里的 [1][2] 角标对应来源卡，可以看到文档、章节和原文片段，并打开原文或文档详情。
               </p>
             </div>
           </div>
@@ -394,9 +450,9 @@ function goQa(text: string) {
               </svg>
             </div>
             <div>
-              <h3 class="feature__title">知识盲区发现</h3>
+              <h3 class="feature__title">知识库可以直接翻</h3>
               <p class="feature__desc">
-                自动统计高频兜底问题，帮助团队识别知识库薄弱环节——"用户问了但我们答不出来"就是下一个该补的方向。
+                产品线 ▸ 版本 ▸ 来源三级导航，支持按标题筛选、阅读文档详情，也能点赞和收藏。
               </p>
             </div>
           </div>
@@ -413,38 +469,16 @@ function goQa(text: string) {
                 stroke-linecap="round"
                 stroke-linejoin="round"
               >
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
             </div>
             <div>
-              <h3 class="feature__title">私有化部署与权限</h3>
+              <h3 class="feature__title">团队文档一起沉淀</h3>
               <p class="feature__desc">
-                单实例单团队，隔离在部署边界（同 GitLab / Gitea）。admin / member 两角色 + 文档团队 / 私有两级可见；发布前密钥扫描防泄露。
-              </p>
-            </div>
-          </div>
-
-          <div class="feature">
-            <div class="feature__icon">
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path
-                  d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m3.343-5.657-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386z"
-                />
-              </svg>
-            </div>
-            <div>
-              <h3 class="feature__title">智能推荐</h3>
-              <p class="feature__desc">
-                基于向量相似度的关联文档推荐——读完一篇自动推荐同领域相关内容；问答后推荐追问方向，让知识探索不断链。
+                登录后可以发布 Markdown 文档，选择团队可见或仅自己可见；会话历史和收藏跨设备保留。
               </p>
             </div>
           </div>
@@ -735,8 +769,24 @@ function goQa(text: string) {
 .product__desc {
   font-size: var(--fs-md);
   color: var(--ink-500);
-  margin-bottom: var(--sp-6);
+  margin-bottom: var(--sp-5);
   line-height: 1.7;
+}
+
+.product__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-6);
+}
+
+.product__tag {
+  padding: 3px 10px;
+  border-radius: 100px;
+  border: 1px solid var(--hairline);
+  background: var(--surface-sunken);
+  font-size: var(--fs-xs);
+  color: var(--ink-600);
 }
 
 .product__meta {
