@@ -20,6 +20,7 @@ import AdminReview from '@/views/admin/AdminReview.vue'
 import AdminModeration from '@/views/admin/AdminModeration.vue'
 import AdminScanRules from '@/views/admin/AdminScanRules.vue'
 import AdminRagDebug from '@/views/admin/AdminRagDebug.vue'
+import AdminSettings from '@/views/admin/AdminSettings.vue'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -128,6 +129,12 @@ const routes: RouteRecordRaw[] = [
         name: 'admin-review',
         component: AdminReview,
         meta: { title: '待复审' },
+      },
+      {
+        path: 'settings',
+        name: 'admin-settings',
+        component: AdminSettings,
+        meta: { title: '系统设置' },
       },
       {
         path: 'rag-debug',

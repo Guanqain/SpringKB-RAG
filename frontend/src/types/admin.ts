@@ -23,3 +23,9 @@ export interface DocumentMetaPayload {
   version?: string
   visibility?: 'team' | 'private'
 }
+
+/** GET/PUT /api/admin/settings */
+export interface AppSettings {
+  teamName: string
+  allowAnonymous: boolean
+}

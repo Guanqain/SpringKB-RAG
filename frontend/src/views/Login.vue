@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { Lock, Message, User } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { requestPasswordCode, resetPassword, sendEmailCode } from '@/api/auth'
+import { fetchSetupStatus } from '@/api/setup'
 import type { EmailCodePurpose } from '@/types/auth'
 
 const route = useRoute()
@@ -23,6 +24,8 @@ const pendingEmail = ref('')
 
 const formRef = ref<FormInstance>()
 const loading = ref(false)
+// 初始化状态：仅在明确返回 initialized=false 时展示引导，请求失败保持静默
+const setupNeeded = ref(false)
 
 const form = reactive({
   identifier: '',
@@ -78,7 +81,11 @@ const rules = computed<FormRules>(() => ({
     activeTab.value === 'register' || needsProfile.value
       ? [
           { required: true, message: '请输入用户名', trigger: 'blur' },
-          { min: 3, max: 32, message: '用户名长度需在 3-32 个字符之间', trigger: 'blur' },
+          {
+            pattern: /^[A-Za-z0-9_-]{3,32}$/,
+            message: '用户名只能包含字母、数字、下划线和连字符，长度 3-32 位',
+            trigger: 'blur',
+          },
         ]
       : [],
   email:
@@ -320,6 +327,15 @@ async function submitForgot() {
 
 onBeforeUnmount(stopTimer)
 onBeforeUnmount(stopForgotTimer)
+
+onMounted(async () => {
+  try {
+    const status = await fetchSetupStatus()
+    setupNeeded.value = status.initialized === false
+  } catch {
+    /* 初始化状态未知：静默，不阻断登录 */
+  }
+})
 </script>
 
 <template>
@@ -333,6 +349,11 @@ onBeforeUnmount(stopForgotTimer)
         </div>
         <h1>Spring<span>KB</span></h1>
         <p>团队知识库 · 登录以继续</p>
+      </div>
+
+      <div v-if="setupNeeded" class="setup-hint">
+        <p class="setup-hint__text">系统尚未初始化，请先创建管理员账号</p>
+        <el-button size="small" @click="router.push('/setup')">去初始化</el-button>
       </div>
 
       <el-tabs v-model="activeTab" class="login-tabs" @tab-change="switchTab">
@@ -381,7 +402,7 @@ onBeforeUnmount(stopForgotTimer)
           <el-form-item prop="username">
             <el-input
               v-model="form.username"
-              placeholder="用户名（3-32 位）"
+              placeholder="用户名（3-32 位字母/数字/_/-）"
               :prefix-icon="User"
               autocomplete="username"
             />
@@ -584,6 +605,25 @@ onBeforeUnmount(stopForgotTimer)
 
 .login-tabs {
   margin-bottom: var(--sp-4);
+}
+
+.setup-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--brand-50);
+}
+
+.setup-hint__text {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--ink-600);
+  line-height: 1.5;
 }
 
 .login-tabs :deep(.el-tabs__nav-wrap)::after {

@@ -51,6 +51,22 @@ public class AppSettingService {
         return get(key).orElse(defaultValue);
     }
 
+    /** 团队名（未配置时回落「我的团队」，供管理端设置页展示）。 */
+    public String getTeamName() {
+        return getOrDefault(KEY_TEAM_NAME, "我的团队");
+    }
+
+    /**
+     * 原子占位初始化标记：首次写入返回 true，已存在（并发请求已占位）返回 false。
+     * 依赖 app_setting.key 主键 + ON CONFLICT DO NOTHING，调用方需在同一事务内完成管理员创建。
+     */
+    public boolean claimSetupComplete() {
+        return jdbcTemplate.update("""
+                INSERT INTO app_setting (key, value) VALUES (?, 'true')
+                ON CONFLICT (key) DO NOTHING
+                """, KEY_SETUP_COMPLETE) > 0;
+    }
+
     public void put(String key, String value) {
         jdbcTemplate.update("""
                 INSERT INTO app_setting (key, value, updated_at) VALUES (?, ?, now())

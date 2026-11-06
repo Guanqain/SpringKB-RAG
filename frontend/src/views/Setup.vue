@@ -40,7 +40,11 @@ const rules: FormRules = {
   ],
   adminUsername: [
     { required: true, message: '请输入管理员用户名', trigger: 'blur' },
-    { min: 3, max: 32, message: '用户名长度需在 3-32 个字符之间', trigger: 'blur' },
+    {
+      pattern: /^[A-Za-z0-9_-]{3,32}$/,
+      message: '用户名只能包含字母、数字、下划线和连字符，长度 3-32 位',
+      trigger: 'blur',
+    },
   ],
   adminEmail: [
     { required: true, message: '请输入管理员邮箱', trigger: 'blur' },
@@ -234,7 +238,7 @@ onBeforeUnmount(stopTimer)
                 <p class="setup__lead">创建第一个管理员账号 —— 它会拥有成员管理与文档管理权限</p>
                 <div class="setup__form">
                   <el-form-item label="管理员用户名" prop="adminUsername">
-                    <el-input v-model="form.adminUsername" placeholder="3-32 位字符" autocomplete="username" />
+                    <el-input v-model="form.adminUsername" placeholder="用户名（3-32 位字母/数字/_/-）" autocomplete="username" />
                   </el-form-item>
                   <el-form-item label="管理员邮箱" prop="adminEmail">
                     <el-input v-model="form.adminEmail" placeholder="用于接收验证码与找回账号" autocomplete="email" />

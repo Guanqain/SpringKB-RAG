@@ -14,6 +14,7 @@ const items = [
   { label: '问答统计', to: '/admin/qa-stats' },
   { label: '知识盲区', to: '/admin/blindspots' },
   { label: '待复审', to: '/admin/review' },
+  { label: '系统设置', to: '/admin/settings' },
   { label: '检索诊断', to: '/admin/rag-debug' },
 ]
 

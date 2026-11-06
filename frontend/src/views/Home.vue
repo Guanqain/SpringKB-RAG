@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { fetchKbOverview, fetchKbTree } from '@/api/kb'
+import { fetchSetupStatus } from '@/api/setup'
 import type { KbOverview, KbTreeNode } from '@/types/kb'
 
 // 首页：Hero + 统计条 + 产品线卡 + 功能区。
@@ -12,8 +13,18 @@ const router = useRouter()
 const overview = ref<KbOverview | null>(null)
 const tree = ref<KbTreeNode[]>([])
 const failed = ref(false)
+const teamName = ref('')
 
 onMounted(async () => {
+  // 团队名异步加载且静默失败：不影响首屏，空值时不渲染整行
+  void fetchSetupStatus()
+    .then((status) => {
+      teamName.value = status.teamName?.trim() ?? ''
+    })
+    .catch(() => {
+      teamName.value = ''
+    })
+
   const [ov, tr] = await Promise.allSettled([fetchKbOverview(), fetchKbTree()])
   if (ov.status === 'fulfilled') overview.value = ov.value
   else failed.value = true
@@ -92,6 +103,7 @@ function goQa(text: string) {
           {{ badgeText }}
         </div>
 
+        <p v-if="teamName" class="hero__team">{{ teamName }} · 私有知识库</p>
         <h1 class="hero__title">
           问一句，<br /><em>答案带出处</em>
         </h1>
@@ -519,6 +531,13 @@ function goQa(text: string) {
   height: 7px;
   border-radius: 50%;
   background: var(--success);
+}
+
+.hero__team {
+  font-size: var(--fs-sm);
+  color: var(--ink-500);
+  letter-spacing: 0.04em;
+  margin-bottom: var(--sp-2);
 }
 
 .hero__title {

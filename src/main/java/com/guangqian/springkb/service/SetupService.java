@@ -1,5 +1,6 @@
 package com.guangqian.springkb.service;
 
+import com.guangqian.springkb.common.Usernames;
 import com.guangqian.springkb.dto.AuthResponse;
 import com.guangqian.springkb.dto.SetupInitRequest;
 import com.guangqian.springkb.dto.SetupStatus;
@@ -53,25 +54,22 @@ public class SetupService {
         if (userRepository.count() > 0) {
             throw new IllegalArgumentException("系统已初始化，禁止重复执行");
         }
-        String username = req.adminUsername();
-        if (username == null || username.isBlank()) {
-            throw new IllegalArgumentException("管理员用户名不能为空");
-        }
-        if (username.length() < 3 || username.length() > 32) {
-            throw new IllegalArgumentException("用户名长度需在 3-32 个字符之间");
-        }
+        String username = Usernames.normalize(req.adminUsername());
         if (req.adminPassword() == null || req.adminPassword().length() < 6) {
             throw new IllegalArgumentException("密码长度至少 6 位");
         }
         String email = EmailCodeService.normalizeEmail(req.adminEmail());
         emailCodeService.verify(email, EmailCodeService.PURPOSE_REGISTER, req.code());
 
+        // 所有校验通过后原子占位：并发请求只有一个能拿到 setup_complete，其余在这里失败并回滚
+        if (!appSettingService.claimSetupComplete()) {
+            throw new IllegalArgumentException("系统已初始化，禁止重复执行");
+        }
         User admin = userRepository.insert(username, email,
                 passwordEncoder.encode(req.adminPassword()), AuthService.ROLE_ADMIN);
         appSettingService.put(AppSettingService.KEY_TEAM_NAME,
                 req.teamName() == null || req.teamName().isBlank() ? "我的团队" : req.teamName().trim());
         appSettingService.setAllowAnonymous(req.allowAnonymous() == null || req.allowAnonymous());
-        appSettingService.put(AppSettingService.KEY_SETUP_COMPLETE, "true");
         return new AuthResponse(jwtUtil.generateToken(admin), UserDto.from(admin));
     }
 }

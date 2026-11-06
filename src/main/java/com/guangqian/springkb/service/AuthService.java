@@ -1,5 +1,6 @@
 package com.guangqian.springkb.service;
 
+import com.guangqian.springkb.common.Usernames;
 import com.guangqian.springkb.dto.AuthResponse;
 import com.guangqian.springkb.dto.CodeLoginResult;
 import com.guangqian.springkb.dto.EmailCodeResult;
@@ -38,9 +39,9 @@ public class AuthService {
 
     /** 注册：邮箱必须通过 register 用途验证码校验；首个用户为 ADMIN，其余为 MEMBER。 */
     public AuthResponse register(String username, String email, String password, String code) {
-        validateCredentials(username, password);
+        String normalizedUsername = validateCredentials(username, password);
         String normalizedEmail = EmailCodeService.normalizeEmail(email);
-        if (userRepository.findByUsername(username).isPresent()) {
+        if (userRepository.findByUsername(normalizedUsername).isPresent()) {
             throw new IllegalArgumentException("用户名已存在");
         }
         if (userRepository.findByEmail(normalizedEmail).isPresent()) {
@@ -48,7 +49,7 @@ public class AuthService {
         }
         emailCodeService.verify(normalizedEmail, EmailCodeService.PURPOSE_REGISTER, code);
         String role = userRepository.count() == 0 ? ROLE_ADMIN : ROLE_MEMBER;
-        User user = userRepository.insert(username, normalizedEmail, passwordEncoder.encode(password), role);
+        User user = userRepository.insert(normalizedUsername, normalizedEmail, passwordEncoder.encode(password), role);
         return new AuthResponse(jwtUtil.generateToken(user), UserDto.from(user));
     }
 
@@ -84,18 +85,18 @@ public class AuthService {
      * 验证码此时才消费；邮箱/用户名占用检查放在验证码校验之后，避免未验证时探测账号存在性。
      */
     public AuthResponse registerByEmailCode(String email, String code, String username, String password) {
-        validateCredentials(username, password);
+        String normalizedUsername = validateCredentials(username, password);
         String normalizedEmail = EmailCodeService.normalizeEmail(email);
         long codeId = emailCodeService.check(normalizedEmail, EmailCodeService.PURPOSE_LOGIN, code);
         if (userRepository.findByEmail(normalizedEmail).isPresent()) {
             throw new IllegalArgumentException("该邮箱已注册，请直接登录");
         }
-        if (userRepository.findByUsername(username).isPresent()) {
+        if (userRepository.findByUsername(normalizedUsername).isPresent()) {
             throw new IllegalArgumentException("用户名已存在");
         }
         emailCodeService.consume(codeId);
         String role = userRepository.count() == 0 ? ROLE_ADMIN : ROLE_MEMBER;
-        User user = userRepository.insert(username, normalizedEmail, passwordEncoder.encode(password), role);
+        User user = userRepository.insert(normalizedUsername, normalizedEmail, passwordEncoder.encode(password), role);
         return new AuthResponse(jwtUtil.generateToken(user), UserDto.from(user));
     }
 
@@ -160,14 +161,10 @@ public class AuthService {
         userRepository.updatePassword(user.id(), passwordEncoder.encode(newPassword));
     }
 
-    private void validateCredentials(String username, String password) {
-        if (username == null || username.isBlank()) {
-            throw new IllegalArgumentException("用户名不能为空");
-        }
-        if (username.length() < 3 || username.length() > 32) {
-            throw new IllegalArgumentException("用户名长度需在 3-32 个字符之间");
-        }
+    private String validateCredentials(String username, String password) {
+        String normalizedUsername = Usernames.normalize(username);
         validatePassword(password);
+        return normalizedUsername;
     }
 
     private static void validatePassword(String password) {
